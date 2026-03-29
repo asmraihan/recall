@@ -76,7 +76,7 @@ export function BatchAddForm() {
     defaultValues: {
       pattern: "default",
       words: "",
-      section: "", 
+      section: "",
     },
   });
 
@@ -84,9 +84,9 @@ export function BatchAddForm() {
 
   const parseWords = (text: string) => {
     if (!languagePrefs) return;
-    
+
     const result = parseBatchWords(text, pattern, form.getValues("section"), languagePrefs);
-    
+
     if (result.errors.length > 0) {
       setParseError(result.errors.join("\n"));
       setParsedWords([]);
@@ -190,7 +190,7 @@ export function BatchAddForm() {
             <AlertDescription className="relative">
               Enter words with their translations in the following format:
               <br />
-                  <br />
+              <br />
               <code className="text-sm">{getExampleFormat()}</code>
               <br /><br />
               Example: das Haus-বাড়ি-house-Das Haus ist groß
@@ -198,7 +198,7 @@ export function BatchAddForm() {
               Prompt: {" "}
               <span>"</span>
               <span ref={promptRef} className="">
-              Give me translation list of {languagePrefs.mainLanguage} words followed by {languagePrefs.translationLanguages[1]} and {languagePrefs.translationLanguages[0]} translations in this exact format: {languagePrefs.mainLanguage}-{languagePrefs.translationLanguages[1]}-{languagePrefs.translationLanguages[0]}-Example Sentence. Use only two hyphens per line - (if there is example sentence matching in given text then three) one between {languagePrefs.mainLanguage} and {languagePrefs.translationLanguages[1]}, one between {languagePrefs.translationLanguages[1]} and {languagePrefs.translationLanguages[0]} and last one between {languagePrefs.translationLanguages[0]} and example sentence if there is any . Never use extra hyphens, dashes, or slashes inside any translation. Use simple, clean translations. Example: Haus-বাড়ি-house-Das Haus ist groß. If a word refers to multiple meanings, choose one clear equivalent. For nouns, always include the definite article (der, die, or das) with the word.
+                Give me translation list of {languagePrefs.mainLanguage} words followed by {languagePrefs.translationLanguages[1]} and {languagePrefs.translationLanguages[0]} translations in this exact format: {languagePrefs.mainLanguage}-{languagePrefs.translationLanguages[1]}-{languagePrefs.translationLanguages[0]}-Example Sentence. Use three hyphens (---) (one between each field). Never use extra hyphens, dashes, or slashes inside any translation. If a German word contains a hyphen (-), replace it with a space. Use simple, clean translations. For nouns: always include the definite article (der, die, das) and immediately after the noun add a comma followed by the plural extension (e.g., das Auto,s for plural "Autos"; die Frau,en; der Kindergarten,¨ for "Kindergärten" — use ¨ for umlaut where needed). For verbs, adjectives, etc., no plural extension. If a word has multiple meanings, choose one clear equivalent. If there is no example sentence given then create sentence  using the word. Example correct line: das Auto,s-গাড়ি-car-Das Auto ist rot.
               </span>
               <span>"</span>
               <button
