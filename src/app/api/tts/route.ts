@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { EdgeTTS } from '@lixen/edge-tts';
+import { Communicate, listVoices } from 'edge-tts-universal';
 
 
 // get all available voices
 
 export async function GET(request: NextRequest) {
   try {
-    const tts = new EdgeTTS();
-    const voices = await tts.getVoices();
+    const voices = await listVoices();
     return NextResponse.json({ voices });
   } catch (error) {
     console.error('TTS error:', error);
@@ -26,15 +25,22 @@ export async function POST(request: Request) {
     }
 
     const selectedVoice = voice || 'de-DE-AmalaNeural';
-    const tts = new EdgeTTS();
-
-    await tts.synthesize(text, selectedVoice, {
+    const communicate = new Communicate(text, {
+      voice: selectedVoice,
       rate: '-20%',    // Slower speed for better comprehension
-      volume: '20%',  // Louder for clarity
+      volume: '+20%',  // Louder for clarity
       pitch: '-10Hz'   // Slightly higher pitch for clearer pronunciation
     });
 
-    const base64Audio = tts.toBase64();
+    const buffers: Buffer[] = [];
+    for await (const chunk of communicate.stream()) {
+      if (chunk.type === 'audio' && chunk.data) {
+        buffers.push(chunk.data);
+      }
+    }
+
+    const audioBuffer = Buffer.concat(buffers);
+    const base64Audio = audioBuffer.toString('base64');
     return NextResponse.json({ audio: base64Audio });
   } catch (error) {
     console.error('TTS error:', error);
