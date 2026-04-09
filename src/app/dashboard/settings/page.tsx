@@ -271,12 +271,14 @@ export default function SettingsPage() {
                     {isLoadingVoices ? (
                       <div className="text-sm text-muted-foreground">Loading voices...</div>
                     ) : (
+                         <div className="text-sm text-wrap text-muted-foreground">
                       <VoiceCombobox
                         voices={voices}
                         value={preferredVoice}
                         onSelect={setPreferredVoice}
                         isLoading={isLoadingVoices}
                       />
+                      </div>
                     )}
                     <p className="text-sm text-muted-foreground">
                       Select the voice used for text-to-speech pronunciation in learning sessions

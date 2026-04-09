@@ -37,7 +37,7 @@ interface VoiceComboboxProps {
 export function VoiceCombobox({ voices, value, onSelect, isLoading }: VoiceComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
-  const selectedVoice = voices.find((voice) => voice.ShortName === value)
+  const selectedVoice = Array.isArray(voices) ? voices.find((voice) => voice.ShortName === value) : undefined
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -50,7 +50,8 @@ export function VoiceCombobox({ voices, value, onSelect, isLoading }: VoiceCombo
           disabled={isLoading}
         >
           {value && selectedVoice
-            ? `${selectedVoice.FriendlyName} (${selectedVoice.Gender})`
+            ? <div className="justify-center text-start text-xs"> <p>{selectedVoice.FriendlyName}</p>
+              <p> - {selectedVoice.Gender}</p></div>
             : "Select a voice..."}
           <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -63,7 +64,7 @@ export function VoiceCombobox({ voices, value, onSelect, isLoading }: VoiceCombo
               {isLoading ? "Loading voices..." : "No voice found."}
             </CommandEmpty>
             <CommandGroup>
-              {voices.map((voice) => (
+              {Array.isArray(voices) && voices.map((voice) => (
                 <CommandItem
                   key={voice.ShortName}
                   value={voice.FriendlyName}

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const { text, voice } = await request.json();
+    const { text, voice, rate, volume, pitch } = await request.json();
 
     if (!text) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
@@ -27,9 +27,9 @@ export async function POST(request: Request) {
     const selectedVoice = voice || 'de-DE-AmalaNeural';
     const communicate = new Communicate(text, {
       voice: selectedVoice,
-      rate: '-20%',    // Slower speed for better comprehension
-      volume: '+20%',  // Louder for clarity
-      pitch: '-10Hz'   // Slightly higher pitch for clearer pronunciation
+      rate: typeof rate === 'string' && rate.trim() ? rate : '-20%',
+      volume: typeof volume === 'string' && volume.trim() ? volume : '+20%',
+      pitch: typeof pitch === 'string' && pitch.trim() ? pitch : '-10Hz',
     });
 
     const buffers: Buffer[] = [];
