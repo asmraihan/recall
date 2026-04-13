@@ -46,11 +46,11 @@ export function VoiceCombobox({ voices, value, onSelect, isLoading }: VoiceCombo
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between py-6 my-4"
           disabled={isLoading}
         >
           {value && selectedVoice
-            ? <div className="justify-center text-start text-xs"> <p>{selectedVoice.FriendlyName}</p>
+            ? <div className="justify-center text-start text-xs text-wrap "> <p>{selectedVoice.FriendlyName}</p>
               <p> - {selectedVoice.Gender}</p></div>
             : "Select a voice..."}
           <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />

@@ -28,6 +28,7 @@ export default function TTSPage() {
   const [volume, setVolume] = useState([20]) // backend default volume +20%
   const [pitch, setPitch] = useState([-10]) // backend default pitch -10Hz
   const [isLoadingVoices, setIsLoadingVoices] = useState(true)
+  const [isLoadingPreferredVoice, setIsLoadingPreferredVoice] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -40,11 +41,25 @@ export default function TTSPage() {
   }, [])
 
   useEffect(() => {
-    if (voices.length && !selectedVoice) {
+    if (!isLoadingVoices && !isLoadingPreferredVoice && voices.length && !selectedVoice) {
       const preferred = voices.find((voice) => voice.ShortName === preferredVoice)
       setSelectedVoice(preferred?.ShortName ?? voices[0].ShortName)
     }
-  }, [voices, preferredVoice, selectedVoice])
+  }, [voices, preferredVoice, selectedVoice, isLoadingVoices, isLoadingPreferredVoice])
+
+  const fetchPreferredVoice = async () => {
+    try {
+      const response = await fetch("/api/user/voice")
+      if (response.ok) {
+        const data = await response.json()
+        setPreferredVoice(data.preferredVoice || "")
+      }
+    } catch (error) {
+      console.error("Failed to load preferred voice", error)
+    } finally {
+      setIsLoadingPreferredVoice(false)
+    }
+  }
 
   const fetchVoices = async () => {
     try {
@@ -66,17 +81,6 @@ export default function TTSPage() {
     }
   }
 
-  const fetchPreferredVoice = async () => {
-    try {
-      const response = await fetch("/api/user/voice")
-      if (response.ok) {
-        const data = await response.json()
-        setPreferredVoice(data.preferredVoice || "")
-      }
-    } catch (error) {
-      console.error("Failed to fetch preferred voice:", error)
-    }
-  }
 
   const handlePlay = async () => {
     if (!text.trim() || !selectedVoice) {
@@ -192,7 +196,7 @@ export default function TTSPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label>Speed: {speed[0]}</Label>
               <Slider
@@ -228,7 +232,7 @@ export default function TTSPage() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="grid grid-cols-2 gap-4">
             <Button onClick={handlePlay} disabled={isGenerating || !text.trim() || !selectedVoice}>
               {isGenerating ? "Generating..." : <><Play className="w-4 h-4 mr-2" /> Play</>}
             </Button>

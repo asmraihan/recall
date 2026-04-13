@@ -40,11 +40,11 @@ export function MobileNav() {
 					<Link
 						key={link.href}
 						href={link.href}
-						className={`flex flex-col items-center gap-1 text-xs px-2 py-1 transition-colors ${
-							isActive ? "text-primary" : "text-muted-foreground"
+						className={`flex flex-col items-center gap-1 text-xs px-2 py-1 transition-colors w-full rounded-md ${
+							isActive ? "text-primary bg-accent" : "text-muted-foreground hover:text-primary hover:bg-accent/50"
 						}`}
 					>
-						<Icon className="h-6 w-6" />
+						<Icon className="h-6 w-6 " />
 						{link.label}
 					</Link>
 				);

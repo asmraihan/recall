@@ -7,6 +7,7 @@ import { Communicate, listVoices } from 'edge-tts-universal';
 export async function GET(request: NextRequest) {
   try {
     const voices = await listVoices();
+    console.log(voices)
     return NextResponse.json({ voices });
   } catch (error) {
     console.error('TTS error:', error);

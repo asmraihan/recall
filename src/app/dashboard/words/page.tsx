@@ -19,6 +19,7 @@ import Link from "next/link";
 import { ExportDialog } from "@/components/words/export-import";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
+import { Columns3Cog } from 'lucide-react';
 
 interface Word {
   id: string;
@@ -164,7 +165,7 @@ export default function WordsPage() {
 
   return (
     <div className="container py-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Words</h1>
           <p className="text-muted-foreground mt-2">
@@ -189,7 +190,7 @@ export default function WordsPage() {
       </div>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-1 items-center gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           <div className="relative w-full max-w-sm">
             <Input
               placeholder="Search words..."
@@ -227,11 +228,24 @@ export default function WordsPage() {
             ]}
             className="w-[180px]"
           />
+            <SingleSelect
+            value={searchParams.get("filter") || "default"}
+            onValueChange={(value) => updateFilters("filter", value)}
+            options={[
+              { value: "default", label: "Normal" },
+              { value: "important", label: "Important" }
+            ]}
+            className="w-[180px]"
+          />
         </div>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex justify-end gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">Columns</Button>
+              <Button variant="outline">
+                <Columns3Cog className="w-4 h-4" />
+                <span className="sr-only">Toggle columns</span>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
@@ -255,18 +269,6 @@ export default function WordsPage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <SingleSelect
-            value={searchParams.get("filter") || "default"}
-            onValueChange={(value) => updateFilters("filter", value)}
-            options={[
-              { value: "default", label: "Default" },
-              { value: "important", label: "Important" }
-            ]}
-            className="w-[180px]"
-          />
-
-
         </div>
       </div>
 
