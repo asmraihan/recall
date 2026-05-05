@@ -175,7 +175,7 @@ export function BatchAddForm() {
   const getExampleFormat = () => {
     const lang1 = languagePrefs.translationLanguages[0] || "Language 1";
     const lang2 = languagePrefs.translationLanguages[1] || "Language 2";
-    return `${languagePrefs.mainLanguage} word-${lang2} translation-${lang1} translation-Example sentence`;
+    return `"${languagePrefs.mainLanguage}","${lang2}","${lang1}","Example sentence"`;
   };
 
   return (
@@ -188,19 +188,36 @@ export function BatchAddForm() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="relative">
-              Enter words with their translations in the following format:
+              Enter words with their translations in the following CSV format (one per line):
               <br />
               <br />
               <code className="text-sm">{getExampleFormat()}</code>
               <br /><br />
-              Example: das Haus-বাড়ি-house-Das Haus ist groß
+              Example: "das Haus","বাড়ি","house","Das Haus ist groß."
               <br /><br />
-              Prompt: {" "}
-              <span>"</span>
-              <span ref={promptRef} className="">
-                Give me translation list of {languagePrefs.mainLanguage} words followed by {languagePrefs.translationLanguages[1]} and {languagePrefs.translationLanguages[0]} translations in this exact format: {languagePrefs.mainLanguage}-{languagePrefs.translationLanguages[1]}-{languagePrefs.translationLanguages[0]}-Example Sentence. Use three hyphens (---) (one between each field). Never use extra hyphens, dashes, or slashes inside any translation. If a German word contains a hyphen (-), replace it with a space. Use simple, clean translations. For nouns: always include the definite article (der, die, das) and immediately after the noun add a comma followed by the plural extension (e.g., das Auto,s for plural "Autos"; die Frau,en; der Kindergarten,¨ for "Kindergärten" — use ¨ for umlaut where needed). For verbs, adjectives, etc., no plural extension. If a word has multiple meanings, choose one clear equivalent. If there is no example sentence given then create sentence  using the word. Example correct line: das Auto,s-গাড়ি-car-Das Auto ist rot.
+              Prompt:
+              <br />
+              <span ref={promptRef} className="block whitespace-pre-line">
+                {`Generate a CSV translation list of ${languagePrefs.mainLanguage} words. Output each word on its own line in this exact format:
+
+"${languagePrefs.mainLanguage}","${languagePrefs.translationLanguages[1]}","${languagePrefs.translationLanguages[0]}","Example sentence"
+
+Rules:
+- Wrap every field in double quotes (").
+- Separate fields with a single comma. No spaces around the comma.
+- Output only the CSV lines — no headers, no numbering, no commentary.
+- Always include an example sentence in ${languagePrefs.mainLanguage}. If none is given, write a natural one using the word.
+- Nouns: include the article (der/die/das) and append the plural after a comma inside the same quoted field, e.g. "das Auto,s", "die Frau,en", "der Kindergarten,¨" (use ¨ for umlaut plurals like Kindergärten).
+- Verbs, adjectives, and all non-nouns: no plural extension.
+- If a word has multiple meanings, pick one clear translation.
+- Hyphens, dashes, slashes, and spaces inside fields are fine because fields are quoted (e.g. "low-priced" and "good day" are valid).
+- If a translation contains a literal double quote, escape it by doubling it: "".
+
+Example output:
+"das Auto,s","গাড়ি","car","Das Auto ist rot."
+"günstig","সস্তা","low-priced","Die Miete ist günstig."
+"guten Tag","শুভ দিন","good day","Guten Tag! Wie geht es Ihnen?"`}
               </span>
-              <span>"</span>
               <button
                 type="button"
                 onClick={handleCopyPrompt}
@@ -217,7 +234,7 @@ export function BatchAddForm() {
             <Label htmlFor="words">Words</Label>
             <Textarea
               id="words"
-              placeholder={`Enter words in format: ${getExampleFormat()}\nExample:\ndas Haus-বাড়ি-house-Das Haus ist groß`}
+              placeholder={`Enter words in format: ${getExampleFormat()}\nExample:\n"das Haus","বাড়ি","house","Das Haus ist groß."`}
               className="font-mono"
               rows={6}
               {...form.register("words", {
@@ -225,7 +242,7 @@ export function BatchAddForm() {
               })}
             />
             <p className="text-sm text-muted-foreground">
-              Enter each word on a new line. Use hyphens (-) to separate parts. No spaces allowed.
+              One word per line. Wrap each field in double quotes and separate with commas. Sentence is optional.
             </p>
           </div>
 

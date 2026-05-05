@@ -46,7 +46,7 @@ export function VoiceCombobox({ voices, value, onSelect, isLoading }: VoiceCombo
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between py-6 my-4"
+          className="w-full justify-between py-7 my-4"
           disabled={isLoading}
         >
           {value && selectedVoice

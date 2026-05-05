@@ -72,7 +72,57 @@ export function getExportHeaders(prefs: UserLanguagePreferences) {
 }
 
 /**
- * Parse batch import words based on user language preferences
+ * Parse a single CSV-style line of quoted, comma-separated fields.
+ * Each field must be wrapped in double quotes; embedded quotes are escaped as "".
+ */
+function parseCSVLine(line: string): { fields: string[] } | { error: string } {
+  const fields: string[] = [];
+  const len = line.length;
+  let i = 0;
+
+  while (i < len) {
+    while (i < len && line[i] === ' ') i++;
+    if (i >= len) break;
+    if (line[i] !== '"') {
+      return { error: `expected '"' at column ${i + 1}` };
+    }
+    i++;
+    let value = '';
+    let closed = false;
+    while (i < len) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          value += '"';
+          i += 2;
+        } else {
+          i++;
+          closed = true;
+          break;
+        }
+      } else {
+        value += ch;
+        i++;
+      }
+    }
+    if (!closed) {
+      return { error: 'unterminated quoted field' };
+    }
+    fields.push(value.trim());
+    while (i < len && line[i] === ' ') i++;
+    if (i < len) {
+      if (line[i] !== ',') {
+        return { error: `expected ',' at column ${i + 1}` };
+      }
+      i++;
+    }
+  }
+  return { fields };
+}
+
+/**
+ * Parse batch import words based on user language preferences.
+ * Format per line: "<main>","<trans2>","<trans1>","<sentence?>"
  */
 export function parseBatchWords(
   text: string,
@@ -88,32 +138,42 @@ export function parseBatchWords(
   const words: any[] = [];
   const errors: string[] = [];
 
-  lines.forEach((line, index) => {
-    const parts = line.split('-');
+  const expected = `"${prefs.mainLanguage}","${prefs.translationLanguages[1]}","${prefs.translationLanguages[0]}","[optional sentence]"`;
 
-    if (parts.length < 3 || parts.length > 4) {
+  lines.forEach((line, index) => {
+    const result = parseCSVLine(line);
+    if ('error' in result) {
       errors.push(
-        `Line ${index + 1}: Invalid format.\n` +
-        `Expected: "${prefs.mainLanguage}-${prefs.translationLanguages[0]}-${prefs.translationLanguages[1]}-[optional sentence]"\n` +
-        `Got: "${line}"`
+        `Line ${index + 1}: ${result.error}.\n` +
+        `Expected: ${expected}\n` +
+        `Got: ${line}`
       );
       return;
     }
 
-    // Validate that required parts are non-empty
-    if (!parts[0].trim() || !parts[1].trim() || !parts[2].trim()) {
+    const { fields } = result;
+    if (fields.length < 3 || fields.length > 4) {
       errors.push(
-        `Line ${index + 1}: ${prefs.mainLanguage}, ${prefs.translationLanguages[0]}, and ${prefs.translationLanguages[1]} are required.\n` +
-        `Got: "${line}"`
+        `Line ${index + 1}: expected 3 or 4 fields, got ${fields.length}.\n` +
+        `Expected: ${expected}\n` +
+        `Got: ${line}`
+      );
+      return;
+    }
+
+    if (!fields[0] || !fields[1] || !fields[2]) {
+      errors.push(
+        `Line ${index + 1}: ${prefs.mainLanguage}, ${prefs.translationLanguages[1]}, and ${prefs.translationLanguages[0]} are required.\n` +
+        `Got: ${line}`
       );
       return;
     }
 
     words.push({
-      mainWord: parts[0].trim(),
-      translation2: parts[1].trim(),
-      translation1: parts[2].trim(),
-      exampleSentence: parts[3]?.trim() || null,
+      mainWord: fields[0],
+      translation2: fields[1],
+      translation1: fields[2],
+      exampleSentence: fields[3] || null,
       section: section,
     });
   });
