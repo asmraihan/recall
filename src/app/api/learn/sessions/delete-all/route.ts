@@ -2,33 +2,26 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { and, eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { learningSessions, sessionWords, learningProgress } from "@/lib/db/schema";
 
-export async function DELETE(req: Request) {
+export async function DELETE() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Delete all session words for the user's sessions
-    await db.delete(sessionWords).where(
-      eq(sessionWords.sessionId, 
-        db.select({ id: learningSessions.id })
-          .from(learningSessions)
-          .where(eq(learningSessions.userId, session.user.id))
-          .limit(1)
-      )
-    );
+    const userId = session.user.id;
 
-    // Delete all learning sessions
-    await db.delete(learningSessions)
-      .where(eq(learningSessions.userId, session.user.id));
+    const userSessionIds = db
+      .select({ id: learningSessions.id })
+      .from(learningSessions)
+      .where(eq(learningSessions.userId, userId));
 
-    // Delete all learning progress
-    await db.delete(learningProgress)
-      .where(eq(learningProgress.userId, session.user.id));
+    await db.delete(sessionWords).where(inArray(sessionWords.sessionId, userSessionIds));
+    await db.delete(learningSessions).where(eq(learningSessions.userId, userId));
+    await db.delete(learningProgress).where(eq(learningProgress.userId, userId));
 
     return NextResponse.json({ message: "All sessions deleted successfully" });
   } catch (error) {

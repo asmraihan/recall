@@ -61,17 +61,18 @@ export default function LearnPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StartSessionDialog mode="mistakes">
-            <Button variant="outline" className="justify-start w-full cursor-pointer">
-              <AlertCircle className="mr-2 h-4 w-4" />
-              Practice Mistakes
-            </Button>
-          </StartSessionDialog>
 
           <StartSessionDialog mode="new">
             <Button variant="outline" className="justify-start w-full cursor-pointer">
               <BookOpen className="mr-2 h-4 w-4" />
               Learn New Words
+            </Button>
+          </StartSessionDialog>
+
+          <StartSessionDialog mode="mistakes">
+            <Button variant="outline" className="justify-start w-full cursor-pointer">
+              <AlertCircle className="mr-2 h-4 w-4" />
+              Practice Mistakes
             </Button>
           </StartSessionDialog>
 
@@ -96,12 +97,12 @@ export default function LearnPage() {
             </Button>
           </StartSessionDialog> */}
 
-        <StartSessionDialog mode="custom">
+          <StartSessionDialog mode="custom">
             <Button variant="outline" className="justify-start w-full cursor-pointer">
               <PenLine className="mr-2 h-4 w-4" />
               Custom Session
             </Button>
-          </StartSessionDialog> 
+          </StartSessionDialog>
 
         </CardContent>
       </Card>

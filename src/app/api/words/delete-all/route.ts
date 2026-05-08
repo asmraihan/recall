@@ -2,18 +2,27 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { and, eq } from "drizzle-orm";
-import { words } from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
+import { words, sessionWords, learningProgress, userWords } from "@/lib/db/schema";
 
-export async function DELETE(req: Request) {
+export async function DELETE() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Delete all words created by the user
-    await db.delete(words).where(eq(words.createdBy, session.user.id));
+    const userId = session.user.id;
+
+    const userWordIds = db
+      .select({ id: words.id })
+      .from(words)
+      .where(eq(words.createdBy, userId));
+
+    await db.delete(sessionWords).where(inArray(sessionWords.wordId, userWordIds));
+    await db.delete(learningProgress).where(inArray(learningProgress.wordId, userWordIds));
+    await db.delete(userWords).where(inArray(userWords.originalWordId, userWordIds));
+    await db.delete(words).where(eq(words.createdBy, userId));
 
     return NextResponse.json({ message: "All words deleted successfully" });
   } catch (error) {
