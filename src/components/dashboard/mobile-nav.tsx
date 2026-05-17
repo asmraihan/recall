@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, ListPlus, GraduationCap, Settings } from "lucide-react";
+import { BookOpen, BookText, ListPlus, GraduationCap, Settings } from "lucide-react";
 
 const navLinks = [
 	{
@@ -19,6 +19,11 @@ const navLinks = [
 		href: "/dashboard/words/add",
 		label: "Add",
 		icon: ListPlus,
+	},
+	{
+		href: "/dashboard/lessons",
+		label: "Lessons",
+		icon: BookText,
 	},
 	{
 		href: "/dashboard/settings",

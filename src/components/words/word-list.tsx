@@ -438,7 +438,14 @@ export function WordList({ words, rowSelection: rowSelectionProp, onRowSelection
       {/* View Word Modal */}
       <Dialog open={viewIndex !== null} onOpenChange={handleViewClose}>
         <DialogContent className="max-w-[100vw - 2rem] sm:max-w-md">
-          <DialogTitle className="">Word Details</DialogTitle>
+          <DialogTitle className="">
+            Word Details
+            {viewIndex !== null && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                ({viewIndex + 1}/{words.length})
+              </span>
+            )}
+          </DialogTitle>
           {viewIndex !== null && (
             <div className="flex flex-col gap-6">
               {/* Main word panel */}
