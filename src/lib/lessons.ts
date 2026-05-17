@@ -33,8 +33,13 @@ function fileToSlug(filename: string): string {
   return filename.replace(/\.md$/i, "").replace(/_/g, "-").toLowerCase();
 }
 
-function slugToFile(slug: string): string {
-  return slug.replace(/-/g, "_").toUpperCase() + ".md";
+async function findFileForSlug(slug: string): Promise<string | null> {
+  const entries = await fs.readdir(LESSONS_DIR);
+  return (
+    entries.find(
+      (f) => f.toLowerCase().endsWith(".md") && fileToSlug(f) === slug
+    ) ?? null
+  );
 }
 
 function deriveTitle(markdown: string, fallback: string): string {
@@ -78,7 +83,8 @@ export async function listLessons(): Promise<LessonMeta[]> {
 export async function getLesson(slug: string): Promise<Lesson | null> {
   configureMarked();
 
-  const filename = slugToFile(slug);
+  const filename = await findFileForSlug(slug);
+  if (!filename) return null;
   let raw: string;
   try {
     raw = await fs.readFile(path.join(LESSONS_DIR, filename), "utf8");

@@ -20,6 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { VoiceCombobox, type Voice } from "@/components/ui/voice-combobox";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -316,9 +317,16 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <p className="text-muted-foreground">
-                  Profile settings will be implemented soon.
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Appearance</Label>
+                  <ThemeToggle />
+                  <p className="text-sm text-muted-foreground">
+                    Choose how the app should look. <strong>System</strong> matches your OS preference.
+                  </p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  More profile settings will be added soon.
                 </p>
               </div>
             </CardContent>
