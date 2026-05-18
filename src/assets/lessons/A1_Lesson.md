@@ -1,4 +1,4 @@
-# Netzwerk Neu A1 – Complete German Grammar Reference
+# Netzwerk Neu A1 – Complete
 
 > A complete grammar companion for Netzwerk Neu A1 (Chapters 1–12).
 > Each topic includes: **Explanation → Structure/Table → Example Sentences → Exceptions & Notes**.

@@ -365,8 +365,8 @@ export default function LearningSessionPage() {
   return (
     <div className="flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Subtle always-visible left/right background overlays */}
-      <div className="absolute left-0 top-0 h-full w-1/2 bg-green-100/20 pointer-events-none z-0 rounded-l-2xl" />
-      <div className="absolute right-0 top-0 h-full w-1/2 bg-red-100/20 pointer-events-none z-0 rounded-r-2xl" />
+      <div className="absolute left-0 top-0 h-full w-1/2 bg-green-100/20 dark:bg-green-500/2 pointer-events-none z-0 rounded-l-2xl" />
+      <div className="absolute right-0 top-0 h-full w-1/2 bg-red-100/20 dark:bg-red-500/2 pointer-events-none z-0 rounded-r-2xl" />
       {/* Main content stays above overlays */}
       <div className="relative z-10 w-full flex flex-col items-center">
         {/* Session Details */}
@@ -492,30 +492,12 @@ export default function LearningSessionPage() {
                     animate={{ rotateX: isFlipped ? 180 : 0, opacity: isFlipped ? 0 : 1 }}
                     transition={{ duration: 0.2, ease: "easeInOut" }}
                   >
-                    <CardContent className="mt-8 md:mt-0 p-6 flex flex-col items-center justify-center gap-10 min-h-[280px] md:min-h-[340px] lg:min-h-[400px]">
+                    <CardContent className="mt-8 md:mt-0 p-6 flex flex-col items-center justify-center min-h-[280px] md:min-h-[340px] lg:min-h-[400px]">
                       <div className="text-2xl font-bold">
                         {direction === "main_to_trans1" && currentCard.word.mainWord}
                         {direction === "trans1_to_main" && currentCard.word.translation1}
                         {direction === "main_to_trans2" && currentCard.word.mainWord}
                         {direction === "trans2_to_main" && currentCard.word.translation2}
-                      </div>
-
-                      <div className="text-sm text-gray-500 flex flex-col gap-2">
-                        {currentCard.word.exampleSentence && (
-                          <>
-                            <em>"{currentCard.word.exampleSentence}"</em>
-                            {exampleSentenceTranslation && (
-                              <div className="text-xs text-muted-foreground italic border-l-2 border-muted pl-2">
-                                {exampleSentenceTranslation}
-                              </div>
-                            )}
-                            {sentenceTranslationLoading && (
-                              <div className="text-xs text-muted-foreground">
-                                Translating...
-                              </div>
-                            )}
-                          </>
-                        )}
                       </div>
                     </CardContent>
                   </motion.div>
@@ -536,10 +518,7 @@ export default function LearningSessionPage() {
                         <>
                           <p className="text-2xl font-bold mb-4">{currentCard.word.translation1}</p>
                           {currentCard.word.translation2 && (
-                            <p className="text-lg text-gray-600">{currentCard.word.translation2}</p>
-                          )}
-                          {currentCard.word.notes && (
-                            <p className="text-sm text-gray-500 mt-8 text-center">N.B. {currentCard.word.notes}</p>
+                            <p className="text-lg text-muted-foreground">{currentCard.word.translation2}</p>
                           )}
                         </>
                       )}
@@ -547,10 +526,7 @@ export default function LearningSessionPage() {
                         <>
                           <p className="text-2xl font-bold mb-4">{currentCard.word.mainWord}</p>
                           {currentCard.word.translation2 && (
-                            <p className="text-lg text-gray-600">{currentCard.word.translation2}</p>
-                          )}
-                          {currentCard.word.notes && (
-                            <p className="text-sm text-gray-500 mt-8 text-center">N.B. {currentCard.word.notes}</p>
+                            <p className="text-lg text-muted-foreground">{currentCard.word.translation2}</p>
                           )}
                         </>
                       )}
@@ -558,10 +534,7 @@ export default function LearningSessionPage() {
                         <>
                           <p className="text-2xl font-bold mb-4">{currentCard.word.translation2}</p>
                           {currentCard.word.translation1 && (
-                            <p className="text-lg text-gray-600">{currentCard.word.translation1}</p>
-                          )}
-                          {currentCard.word.notes && (
-                            <p className="text-sm text-gray-500 mt-8 text-center">N.B. {currentCard.word.notes}</p>
+                            <p className="text-lg text-muted-foreground">{currentCard.word.translation1}</p>
                           )}
                         </>
                       )}
@@ -569,12 +542,27 @@ export default function LearningSessionPage() {
                         <>
                           <p className="text-2xl font-bold mb-4">{currentCard.word.mainWord}</p>
                           {currentCard.word.translation1 && (
-                            <p className="text-lg text-gray-600">{currentCard.word.translation1}</p>
-                          )}
-                          {currentCard.word.notes && (
-                            <p className="text-sm text-gray-500 mt-8 text-center">N.B. {currentCard.word.notes}</p>
+                            <p className="text-lg text-muted-foreground">{currentCard.word.translation1}</p>
                           )}
                         </>
+                      )}
+
+                      {currentCard.word.exampleSentence && (
+                        <div className="text-sm text-muted-foreground flex flex-col items-center gap-2 mt-6 px-4">
+                          <em className="text-center">&quot;{currentCard.word.exampleSentence}&quot;</em>
+                          {exampleSentenceTranslation && (
+                            <div className="text-xs italic border-l-2 border-muted pl-2 text-center">
+                              {exampleSentenceTranslation}
+                            </div>
+                          )}
+                          {sentenceTranslationLoading && (
+                            <div className="text-xs">Translating...</div>
+                          )}
+                        </div>
+                      )}
+
+                      {currentCard.word.notes && (
+                        <p className="text-sm text-muted-foreground mt-6 text-center">N.B. {currentCard.word.notes}</p>
                       )}
                     </CardContent>
                   </motion.div>
@@ -603,7 +591,7 @@ export default function LearningSessionPage() {
                 {/* TTS Button - show for any valid direction */}
                 {(direction === "main_to_trans1" || direction === "trans1_to_main" || direction === "main_to_trans2" || direction === "trans2_to_main") && (
                   <button
-                    className="absolute bottom-4 right-4 z-20 bg-white/90 rounded-full p-2 shadow-lg border hover:bg-primary/10 transition"
+                    className="absolute bottom-4 right-4 z-20 bg-background/90 text-foreground rounded-full p-2 shadow-lg border hover:bg-primary/10 transition"
                     disabled={ttsLoading}
                     onClick={e => {
                       e.stopPropagation();
@@ -640,7 +628,7 @@ export default function LearningSessionPage() {
         {/* REMOVE DESKTOP NAVIGATION BUTTONS */}
 
         {/* Mobile Instructions */}
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-sm text-muted-foreground mt-4">
           {showContinueHint ? (
             <span className="text-blue-500">Drag card in any direction to continue learning.</span>
           ) : currentIndex < lastUnansweredIndex ? (

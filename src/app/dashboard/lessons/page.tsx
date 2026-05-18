@@ -22,9 +22,9 @@ export default async function LessonsIndexPage() {
       ) : (
         <div className="grid gap-3">
           {lessons.map((lesson) => (
-            <Link key={lesson.slug} href={`/dashboard/lessons/${lesson.slug}`} className="group">
-              <Card className="transition-colors group-hover:bg-accent/40">
-                <CardContent className="flex items-center gap-4 p-4">
+            <Link key={lesson.slug} href={`/dashboard/lessons/${lesson.slug}`} className="group block">
+              <Card className="transition-colors group-hover:bg-accent/40 overflow-hidden">
+                <CardContent className="flex items-center gap-4 p-4 min-w-0">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <BookText className="h-5 w-5" />
                   </div>

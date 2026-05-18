@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, List } from "lucide-react";
 import { getLesson, listLessons } from "@/lib/lessons";
+import { LessonToc } from "@/components/lessons/lesson-toc";
 
 export const dynamic = "force-static";
 
@@ -68,7 +69,10 @@ export default async function LessonPage({
             prose-headings:scroll-mt-20 prose-headings:font-semibold
             prose-h1:text-2xl prose-h2:text-xl prose-h3:text-base
             prose-h2:mt-10 prose-h2:pb-1 prose-h2:border-b
-            prose-table:text-sm prose-th:bg-muted/40 prose-th:text-left
+            prose-table:text-sm prose-th:text-left
+            [&_table]:border [&_table]:border-collapse
+            [&_th]:border [&_th]:px-3 [&_th]:py-2 [&_th]:align-top [&_th]:bg-muted/40
+            [&_td]:border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
             prose-code:before:content-none prose-code:after:content-none
             prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5
             prose-pre:bg-muted prose-blockquote:border-l-primary/50
@@ -77,24 +81,8 @@ export default async function LessonPage({
         />
 
         {sections.length > 0 && (
-          <aside className="hidden lg:block">
-            <nav className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                On this page
-              </div>
-              <ol className="space-y-1.5 text-sm border-l">
-                {sections.map((s) => (
-                  <li key={s.id}>
-                    <a
-                      href={`#${s.id}`}
-                      className="block -ml-px pl-3 py-0.5 border-l border-transparent text-muted-foreground hover:text-foreground hover:border-foreground/50"
-                    >
-                      {s.text}
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            </nav>
+          <aside className="hidden lg:block lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+            <LessonToc sections={sections} />
           </aside>
         )}
       </div>

@@ -189,12 +189,26 @@ export default function SettingsPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <Tabs defaultValue="languages" className="w-full">
+      <Tabs defaultValue="profile" className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="languages">Languages</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="languages">Languages</TabsTrigger>
           <TabsTrigger value="danger">Account Reset</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="profile">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Settings</CardTitle>
+              <CardDescription>
+                Manage your profile information
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Profile settings content */}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="languages">
           <Card>
