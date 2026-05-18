@@ -56,11 +56,11 @@ function configureMarked() {
     gfm: true,
     breaks: false,
     renderer: {
-      heading({ tokens, depth }) {
-        const text = this.parser.parseInline(tokens);
-        const plain = text.replace(/<[^>]+>/g, "");
+      heading({ text, tokens, depth }) {
+        const html = this.parser.parseInline(tokens);
+        const plain = text.replace(/[*_`]/g, "");
         const id = slugify(plain);
-        return `<h${depth} id="${id}">${text}</h${depth}>\n`;
+        return `<h${depth} id="${id}">${html}</h${depth}>\n`;
       },
     },
   });
@@ -104,7 +104,14 @@ export async function getLesson(slug: string): Promise<Lesson | null> {
     toc.push({ depth, text, id: slugify(text) });
   }
 
-  const html = await marked.parse(raw);
+  const rawHtml = await marked.parse(raw);
+  // Normalize in-document anchor hrefs (e.g. the markdown's own TOC) so that
+  // legacy double-hyphen GitHub-style slugs like "...pronouns--verb..." match
+  // our single-hyphen heading IDs.
+  const html = rawHtml.replace(/href="#([^"]+)"/g, (_m, anchor: string) => {
+    const fixed = anchor.replace(/-+/g, "-").replace(/^-|-$/g, "");
+    return `href="#${fixed}"`;
+  });
 
   return { slug, title, filename, html, toc };
 }
