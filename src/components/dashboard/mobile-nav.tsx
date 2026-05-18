@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, BookText, ListPlus, GraduationCap, Settings } from "lucide-react";
+import { Astroid, BookOpen, BookText, ListPlus, GraduationCap, Settings } from "lucide-react";
 
 const navLinks = [
 	{
@@ -16,15 +16,16 @@ const navLinks = [
 		icon: BookOpen,
 	},
 	{
-		href: "/dashboard/words/add",
-		label: "Add",
-		icon: ListPlus,
+		href: "/dashboard/quiz",
+		label: "Quiz",
+		icon: Astroid,
 	},
 	{
 		href: "/dashboard/lessons",
 		label: "Lessons",
 		icon: BookText,
 	},
+
 	{
 		href: "/dashboard/settings",
 		label: "Settings",
@@ -45,9 +46,8 @@ export function MobileNav() {
 					<Link
 						key={link.href}
 						href={link.href}
-						className={`flex flex-col items-center gap-1 text-xs px-2 py-1 transition-colors w-full rounded-md ${
-							isActive ? "text-primary bg-accent" : "text-muted-foreground hover:text-primary hover:bg-accent/50"
-						}`}
+						className={`flex flex-col items-center gap-1 text-xs px-2 py-1 transition-colors w-full rounded-md ${isActive ? "text-primary bg-accent" : "text-muted-foreground hover:text-primary hover:bg-accent/50"
+							}`}
 					>
 						<Icon className="h-6 w-6 " />
 						{link.label}

@@ -100,6 +100,7 @@ export async function getLesson(slug: string): Promise<Lesson | null> {
   while ((m = headingRe.exec(raw)) !== null) {
     const depth = m[1].length;
     const text = m[2].trim().replace(/[*_`]/g, "");
+    if (/^table of contents$/i.test(text)) continue;
     toc.push({ depth, text, id: slugify(text) });
   }
 

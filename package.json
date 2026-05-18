@@ -55,7 +55,7 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.16.0",
     "json2csv": "^6.0.0-alpha.2",
-    "lucide-react": "^0.513.0",
+    "lucide-react": "^1.16.0",
     "marked": "^18.0.3",
     "next": "15.3.6",
     "next-auth": "^4.24.11",

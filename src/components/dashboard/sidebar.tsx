@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
+  Astroid ,
   BookOpen,
   BookText,
   Home,
@@ -16,7 +17,7 @@ import {
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: GraduationCap },
   { name: "My Words", href: "/dashboard/words", icon: BookOpen },
-  { name: "Add Words", href: "/dashboard/words/add", icon: ListPlus },
+  { name: "Quiz", href: "/dashboard/quiz", icon: Astroid  },
   { name: "Lessons", href: "/dashboard/lessons", icon: BookText },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
