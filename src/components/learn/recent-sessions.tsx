@@ -112,9 +112,7 @@ export function RecentSessions() {
             key={session.id}
             className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-3 bg-card shadow-sm cursor-pointer hover:bg-accent/60 transition"
             onClick={() => {
-              if (!session.completedAt) {
-                router.push(`/dashboard/learn/session/${session.id}`);
-              }
+              router.push(`/dashboard/learn/session/${session.id}`);
             }}
           >
             <div className="flex-1 min-w-0">

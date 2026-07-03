@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { useTranslation } from "@/hooks/use-translation-cache";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Word {
   id: string;
@@ -29,6 +30,7 @@ interface CardState {
 
 export default function LearningSessionPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { sessionId } = useParams<{ sessionId: string }>();
   const [loading, setLoading] = useState(true);
   const [words, setWords] = useState<Word[]>([]);
@@ -163,8 +165,15 @@ export default function LearningSessionPage() {
         setIncorrectCount(incorrect);
         // Set currentIndex to first unanswered card, or last card if all answered
         const firstUnanswered = fetchedWords.findIndex((w: { answeredAt?: string | null }) => !w.answeredAt);
-        setCurrentIndex(firstUnanswered === -1 ? fetchedWords.length - 1 : firstUnanswered);
-        setLastUnansweredIndex(firstUnanswered === -1 ? fetchedWords.length - 1 : firstUnanswered);
+        if (firstUnanswered === -1) {
+          // All words answered (session already completed) — show results screen
+          setCompleted(true);
+          setCurrentIndex(fetchedWords.length - 1);
+          setLastUnansweredIndex(fetchedWords.length - 1);
+        } else {
+          setCurrentIndex(firstUnanswered);
+          setLastUnansweredIndex(firstUnanswered);
+        }
 
         // No need to set important state, use word.important directly
       } catch (err: unknown) {
@@ -234,6 +243,8 @@ export default function LearningSessionPage() {
         const nextUnanswered = prevCards.findIndex((c, idx) => idx > currentIndex && !c.answered);
         if (nextUnanswered === -1) {
           setCompleted(true);
+          // Mark the recent-sessions cache stale so the dashboard list refreshes on remount
+          queryClient.invalidateQueries({ queryKey: ["recent-sessions"] });
           setCurrentIndex(prevCards.length - 1);
           setLastUnansweredIndex(prevCards.length - 1);
         } else {
@@ -340,6 +351,32 @@ export default function LearningSessionPage() {
   }
 
   if (completed) {
+    const handlePracticeMistakes = async () => {
+      try {
+        const response = await fetch("/api/learn/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "session_mistakes",
+            direction,
+            sourceSessionId: sessionId,
+          }),
+        });
+        if (!response.ok) {
+          let errorMsg = "Failed to start mistakes session";
+          try {
+            const errorData = await response.json();
+            if (errorData?.error) errorMsg = errorData.error;
+          } catch {}
+          throw new Error(errorMsg);
+        }
+        const data = await response.json();
+        router.push(`/dashboard/learn/session/${data.sessionId}`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to start mistakes session");
+      }
+    };
+
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
         <Card className="w-full max-w-md">
@@ -353,6 +390,11 @@ export default function LearningSessionPage() {
               <div className="text-red-600">✗ {incorrectCount} incorrect</div>
             </div>
             <Button onClick={() => router.push('/dashboard')}>Back to Learn</Button>
+            {incorrectCount > 0 && (
+              <Button variant="secondary" onClick={handlePracticeMistakes}>
+                Practice Mistakes ({incorrectCount})
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

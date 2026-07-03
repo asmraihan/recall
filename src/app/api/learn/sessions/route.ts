@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const { type, direction, sections, wordCount } = await req.json();
+    const { type, direction, sections, wordCount, sourceSessionId } = await req.json();
 
     // Validate input
     if (!type || !direction) {
@@ -212,6 +212,42 @@ export async function POST(req: Request) {
           )
           .orderBy(sql`RANDOM()`);
         wordsToLearn = customLimit ? await query.limit(customLimit) : await query;
+        break;
+      }
+
+      case "session_mistakes": {
+        // Re-practice only the words answered incorrectly in a specific session
+        if (!sourceSessionId) {
+          return new NextResponse("Missing sourceSessionId", { status: 400 });
+        }
+        const wrongRows = await db
+          .select({ wordId: sessionWords.wordId })
+          .from(sessionWords)
+          .where(
+            and(
+              eq(sessionWords.sessionId, sourceSessionId),
+              eq(sessionWords.isCorrect, false)
+            )
+          );
+        const wrongWordIds = wrongRows.map((w) => w.wordId);
+        if (wrongWordIds.length > 0) {
+          wordsToLearn = await db
+            .select({
+              id: words.id,
+              mainWord: words.mainWord,
+              translation1: words.translation1,
+              translation2: words.translation2,
+              section: words.section,
+            })
+            .from(words)
+            .where(
+              and(
+                eq(words.createdBy, session.user.id),
+                inArray(words.id, wrongWordIds)
+              )
+            )
+            .orderBy(sql`RANDOM()`);
+        }
         break;
       }
 
