@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { words, learningProgress } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 
 const wordSchema = z.object({
@@ -127,6 +127,31 @@ export async function GET(req: NextRequest) {
 
     if (filterParam === "important") {
       userWords = userWords.filter((w) => w.important === true);
+    } else if (filterParam === "mistakes") {
+      // Same criteria as the "mistakes" session type:
+      // low mastery (< 3) and either more incorrect than correct attempts
+      // or a correct ratio below 70%
+      const mistakeRows = await db
+        .select({ wordId: learningProgress.wordId })
+        .from(learningProgress)
+        .where(
+          and(
+            eq(learningProgress.userId, session.user.id),
+            sql`(
+              ${learningProgress.masteryLevel} < 3
+              AND (
+                ${learningProgress.incorrectAttempts} > ${learningProgress.correctAttempts}
+                OR (
+                  ${learningProgress.correctAttempts} + ${learningProgress.incorrectAttempts} > 0
+                  AND CAST(${learningProgress.correctAttempts} AS FLOAT) /
+                  (${learningProgress.correctAttempts} + ${learningProgress.incorrectAttempts}) < 0.7
+                )
+              )
+            )`
+          )
+        );
+      const mistakeIds = new Set(mistakeRows.map((r) => r.wordId));
+      userWords = userWords.filter((w) => mistakeIds.has(w.id));
     }
 
     return NextResponse.json(userWords);

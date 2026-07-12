@@ -233,7 +233,8 @@ export default function WordsPage() {
             onValueChange={(value) => updateFilters("filter", value)}
             options={[
               { value: "default", label: "Normal" },
-              { value: "important", label: "Important" }
+              { value: "important", label: "Important" },
+              { value: "mistakes", label: "Mistakes" }
             ]}
             className="w-[180px]"
           />

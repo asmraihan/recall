@@ -36,6 +36,8 @@ export async function POST(req: Request) {
 
     // Get words based on session type
     let wordsToLearn: Word[] = [];
+    // Sections stored on the session; derived from words for session_mistakes
+    let sessionSections: unknown[] = Array.isArray(sections) ? sections : [];
     // Determine limit for custom session
     let customLimit: number | undefined = 20;
     if (["randomized", "mistakes", "important"].includes(type) && wordCount) {
@@ -247,6 +249,11 @@ export async function POST(req: Request) {
               )
             )
             .orderBy(sql`RANDOM()`);
+          // No section filter applies here, so record the sections of the
+          // words actually being re-practiced
+          sessionSections = [...new Set(wordsToLearn.map((w) => w.section))].sort(
+            (a, b) => Number(a) - Number(b)
+          );
         }
         break;
       }
@@ -287,7 +294,7 @@ export async function POST(req: Request) {
       userId: session.user.id,
       sessionType: type,
       direction,
-      sections: Array.isArray(sections) ? sections : [],
+      sections: sessionSections,
       status: "in_progress",
       totalWords: wordsToLearn.length,
       correctAnswers: 0,
