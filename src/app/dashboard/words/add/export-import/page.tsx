@@ -40,6 +40,7 @@ export default function ExportImportPage() {
                   <li>Translation 2 (second translation language)</li>
                   <li>Example sentences</li>
                   <li>Notes</li>
+                  <li>Important flag</li>
                   <li>Section numbers</li>
                   <li>Creation and update dates</li>
                 </ul>
@@ -79,7 +80,7 @@ export default function ExportImportPage() {
                   <li>CSV format with UTF-8 encoding</li>
                   <li>Maximum 100 words per import</li>
                   <li>Required columns: mainWord, section</li>
-                  <li>Optional columns: translation1, translation2, exampleSentence, notes</li>
+                  <li>Optional columns: translation1, translation2, exampleSentence, notes, important</li>
                   <li>At least one translation is required</li>
                 </ul>
               </div>

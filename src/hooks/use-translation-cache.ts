@@ -19,6 +19,9 @@ export function useTranslation(text: string | null, options: TranslationOptions 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Track the latest text so retry() can refetch without stale closures
+  const textRef = useRef<string | null>(text);
+  textRef.current = text;
 
   const getCacheKey = useCallback((t: string, lang: string) => `${t}|${lang}`, []);
 
@@ -39,6 +42,9 @@ export function useTranslation(text: string | null, options: TranslationOptions 
         setTranslation(cachedResult);
         setError(null);
       } catch (err) {
+        // Evict the failed promise so a retry can refetch instead of
+        // re-awaiting the same rejected result forever.
+        translationCache.delete(cacheKey);
         setError(err instanceof Error ? err.message : 'Translation failed');
         setTranslation(null);
       } finally {
@@ -73,6 +79,9 @@ export function useTranslation(text: string | null, options: TranslationOptions 
       setError(null);
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
+        // Evict the failed promise so a retry can refetch instead of
+        // re-awaiting the same rejected result forever.
+        translationCache.delete(cacheKey);
         setError(err.message || 'Translation failed');
         setTranslation(null);
       }
@@ -80,6 +89,16 @@ export function useTranslation(text: string | null, options: TranslationOptions 
       setLoading(false);
     }
   }, [targetLanguage, getCacheKey]);
+
+  // Manually refetch the current text (used by the UI retry button).
+  const retry = useCallback(() => {
+    const t = textRef.current;
+    if (!t || !t.trim()) return;
+    abortControllerRef.current = new AbortController();
+    translationCache.delete(getCacheKey(t, targetLanguage));
+    setError(null);
+    fetchTranslation(t);
+  }, [getCacheKey, targetLanguage, fetchTranslation]);
 
   useEffect(() => {
     // Cancel previous request if component unmounts or text changes
@@ -100,7 +119,7 @@ export function useTranslation(text: string | null, options: TranslationOptions 
     };
   }, [text, targetLanguage, fetchTranslation]);
 
-  return { translation, loading, error };
+  return { translation, loading, error, retry };
 }
 
 /**

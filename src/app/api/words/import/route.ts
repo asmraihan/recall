@@ -13,6 +13,18 @@ const wordSchema = z.object({
   translation2: z.string().nullable(),
   exampleSentence: z.string().nullable(),
   notes: z.string().nullable(),
+  // Coerce the CSV string ("true"/"false"/"1"/"0"/…) into a boolean.
+  // Defaults to false when the column is absent (older exports) or empty.
+  important: z
+    .preprocess((val) => {
+      if (typeof val === "boolean") return val;
+      if (typeof val === "string") {
+        const v = val.trim().toLowerCase();
+        return v === "true" || v === "1" || v === "yes";
+      }
+      return false;
+    }, z.boolean())
+    .default(false),
   section: z.string().min(1, "Section is required"),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

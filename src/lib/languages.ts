@@ -111,6 +111,7 @@ export function getExportHeaders(prefs: UserLanguagePreferences) {
     section: 'Section',
     exampleSentence: 'Sentence',
     notes: 'Notes',
+    important: 'Important',
   };
 }
 

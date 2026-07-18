@@ -175,7 +175,10 @@ export default function WordsPage() {
         <div className="flex gap-2">
           <ExportDialog
             selectedIds={Object.keys(rowSelection).filter((id) => rowSelection[id])}
-            visibleColumns={Object.keys(columnVisibility).filter((k) => columnVisibility[k] && k !== "actions")}
+            visibleColumns={[
+              ...Object.keys(columnVisibility).filter((k) => columnVisibility[k] && k !== "actions"),
+              "important", // always exported so the flag round-trips (not a toggleable column)
+            ]}
             section={section ?? undefined}
             totalWords={filteredWords.length}
             allowAll={false}

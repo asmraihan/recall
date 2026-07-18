@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, memo, useOptimistic, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, Star, Volume2, ChevronLeft, ChevronRight, Eye, Play, Pause } from "lucide-react";
+import { Pencil, Trash2, Star, Volume2, ChevronLeft, ChevronRight, Eye, Play, Pause, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -225,10 +225,12 @@ export function WordList({ words, rowSelection: rowSelectionProp, onRowSelection
 
   // Use the new translation cache hook for the sentence
   const currentWord = viewIndex !== null ? words[viewIndex] : null;
-  const { translation: sentenceTranslation, loading: translationLoading } = useTranslation(
-    currentWord?.exampleSentence || null,
-    { targetLanguage: 'en' }
-  );
+  const {
+    translation: sentenceTranslation,
+    loading: translationLoading,
+    error: translationError,
+    retry: retryTranslation,
+  } = useTranslation(currentWord?.exampleSentence || null, { targetLanguage: 'en' });
 
   const columns = useMemo<ColumnDef<Word>[]>(() => [
     {
@@ -508,6 +510,22 @@ export function WordList({ words, rowSelection: rowSelectionProp, onRowSelection
                     {translationLoading && (
                       <div className="text-xs text-muted-foreground pl-9">
                         Translating...
+                      </div>
+                    )}
+                    {translationError && !translationLoading && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => retryTranslation()}
+                          title="Retry translation"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm italic text-muted-foreground">
+                          Couldn&apos;t translate.
+                        </span>
                       </div>
                     )}
                   </div>

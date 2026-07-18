@@ -12,6 +12,7 @@ const defaultFields = [
   "translation2",
   "exampleSentence",
   "notes",
+  "important",
   "section",
   "createdAt",
   "updatedAt",
@@ -57,7 +58,11 @@ export async function POST(req: Request) {
       userWords = await fetchWordsForUser(session.user.id as string, section);
     }
 
-    const fields = Array.isArray(columns) && columns.length > 0 ? columns : defaultFields;
+    const requestedFields =
+      Array.isArray(columns) && columns.length > 0 ? columns : defaultFields;
+    // Always include the important flag so it round-trips even when a column
+    // subset is selected (it isn't a toggleable table column). Set dedupes.
+    const fields = Array.from(new Set([...requestedFields, "important"]));
 
     // Convert to CSV
     const json2csvParser = new Parser({ fields });
