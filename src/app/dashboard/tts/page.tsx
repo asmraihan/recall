@@ -98,7 +98,8 @@ export default function TTSPage() {
         body: JSON.stringify({
           text: text.trim(),
           voice: selectedVoice,
-          rate: speed[0],
+          // edge-tts requires signed strings: rate/volume as "+N%", pitch as "+NHz"
+          rate: `${speed[0] >= 0 ? "+" : ""}${speed[0]}%`,
           volume: `${volume[0] >= 0 ? "+" : ""}${volume[0]}%`,
           pitch: `${pitch[0] >= 0 ? "+" : ""}${pitch[0]}Hz`,
         }),
@@ -198,7 +199,7 @@ export default function TTSPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <Label>Speed: {speed[0]}</Label>
+              <Label>Speed: {speed[0]}%</Label>
               <Slider
                 value={speed}
                 onValueChange={setSpeed}

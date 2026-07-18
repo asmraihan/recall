@@ -16,6 +16,21 @@ export async function GET(request: NextRequest) {
 
 // synthesize text to speech
 
+// edge-tts validates these strictly and throws on a bad format:
+//   rate/volume must match /^[+-]\d+%$/   (e.g. "+20%", "-10%")
+//   pitch must match       /^[+-]\d+Hz$/  (e.g. "+10Hz", "-10Hz")
+// Normalize defensively so a missing/malformed value falls back instead of 500ing.
+function normalizeParam(value: unknown, pattern: RegExp, fallback: string): string {
+  if (typeof value === 'string' && pattern.test(value.trim())) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    // Tolerate a bare number by applying the fallback's unit and sign
+    const unit = fallback.replace(/^[+-]?\d+/, '');
+    const normalized = `${value >= 0 ? '+' : ''}${Math.trunc(value)}${unit}`;
+    if (pattern.test(normalized)) return normalized;
+  }
+  return fallback;
+}
+
 export async function POST(request: Request) {
   try {
     const { text, voice, rate, volume, pitch } = await request.json();
@@ -27,9 +42,9 @@ export async function POST(request: Request) {
     const selectedVoice = voice || 'de-DE-AmalaNeural';
     const communicate = new Communicate(text, {
       voice: selectedVoice,
-      rate: typeof rate === 'string' && rate.trim() ? rate : '-20%',
-      volume: typeof volume === 'string' && volume.trim() ? volume : '+20%',
-      pitch: typeof pitch === 'string' && pitch.trim() ? pitch : '-10Hz',
+      rate: normalizeParam(rate, /^[+-]\d+%$/, '-20%'),
+      volume: normalizeParam(volume, /^[+-]\d+%$/, '+20%'),
+      pitch: normalizeParam(pitch, /^[+-]\d+Hz$/, '-10Hz'),
     });
 
     const buffers: Buffer[] = [];

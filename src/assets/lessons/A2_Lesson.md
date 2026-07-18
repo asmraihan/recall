@@ -1,4 +1,4 @@
-# Netzwerk Neu A2 – Complete
+# Netzwerk Neu A2 – Complete Notebook
 
 > A complete grammar companion for Netzwerk Neu A2 (Chapters 1–12).
 > Each topic includes: **Explanation → Structure/Table → Example Sentences → Exceptions & Notes**.

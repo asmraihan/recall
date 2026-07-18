@@ -47,6 +47,49 @@ export function getLanguageLabels(prefs: UserLanguagePreferences) {
 }
 
 /**
+ * Build the glossary-formatting prompt used both in the batch-add UI (shown so
+ * users can run it in an external chat) and by the AI-format API endpoint.
+ * Produces CSV lines that parseBatchWords() can consume directly.
+ */
+export function buildGlossarFormatPrompt(prefs: UserLanguagePreferences): string {
+  const main = prefs.mainLanguage;
+  const trans1 = prefs.translationLanguages[0] || 'Language 1';
+  const trans2 = prefs.translationLanguages[1] || 'Language 2';
+
+  return `Generate a CSV translation list of ${main} words. Output each word on its own line in this exact format:
+
+"${main}","${trans2}","${trans1}","Example sentence"
+
+Rules:
+- Wrap every field in double quotes (").
+- Separate fields with a single comma. No spaces around the comma.
+- Output only the CSV lines — no headers, no numbering, no commentary.
+- Always include an example sentence in ${main}. If none is given, write a natural one using the word.
+- Nouns: include the article (der/die/das) and append the plural after a comma inside the same quoted field, e.g. "das Auto,s", "die Frau,en", "der Kindergarten,¨" (use ¨ for umlaut plurals like Kindergärten).
+- Verbs, adjectives, and all non-nouns: no plural extension.
+- If a word has multiple meanings, pick one clear translation.
+- Hyphens, dashes, slashes, and spaces inside fields are fine because fields are quoted (e.g. "low-priced" and "good day" are valid).
+- NEVER output a raw double quote inside a field. The only allowed double quotes are the ones that wrap each field. If some inner text truly needs a quote, double it ("").
+
+Handling messy / pasted input:
+- The input is often copied from a printed glossary and may be messy. Clean it up:
+  - Fix obvious OCR/scan errors to correct ${main} spelling (e.g. "KQste" → "Küste", "Sqnd" → "Sand", "gngenehm" → "angenehm", "1m" → "Im").
+  - Rejoin example sentences that were split across lines.
+- The source words and their translations may appear as two separate blocks or columns rather than paired lines. Match them up in their original order, one to one.
+- When a translation, article, plural, or example sentence is already given in the input, use it (after cleaning) instead of inventing a new one. Only invent what is missing.
+- Interpret these source notations instead of copying them literally:
+  - "(Sg.)" means singular-only — omit the plural extension entirely.
+  - "hier:" or "hier." marks the intended meaning in context — use that translation.
+  - A straight double quote marking an umlaut plural, e.g. 'der Gruß, "-e', means the umlauted plural (Grüße). Convert it to the ¨ convention: write "der Gruß,¨e". Do not keep the double quote.
+
+Example output:
+"das Auto,s","গাড়ি","car","Das Auto ist rot."
+"günstig","সস্তা","low-priced","Die Miete ist günstig."
+"guten Tag","শুভ দিন","good day","Guten Tag! Wie geht es Ihnen?"
+"der Gruß,¨e","শুভেচ্ছা","greeting","Er schickt viele Grüße aus dem Urlaub."`;
+}
+
+/**
  * Get column accessor keys for database
  */
 export function getColumnAccessors() {

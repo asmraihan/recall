@@ -1,6 +1,8 @@
 // Requires env:
-//   OPENROUTER_API_KEY=...        (required)
-//   OPENROUTER_MODEL=...          (optional, defaults to google/gemini-2.0-flash-exp:free)
+//   GEMINI_API_KEY=...            (required) — Google AI Studio API key (free tier)
+//   GEMINI_MODEL=...              (optional, defaults to gemini-flash-latest)
+//
+// Get a free key at https://aistudio.google.com/app/apikey
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -30,8 +32,44 @@ const requestSchema = z.discriminatedUnion("mode", [
   grammarRequestSchema,
 ]);
 
-const MODEL = process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-exp:free";
-const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+
+// Exam-style guidance per CEFR level, used to shape questions after the
+// format, topics, and grammar scope of the Goethe-Zertifikat / telc exams.
+const EXAM_STYLE: Record<string, string> = {
+  A1: `Model the questions on the Goethe-Zertifikat A1 (Start Deutsch 1) and telc Deutsch A1 exams:
+- Everyday topics: greetings, family, shopping, food, time and dates, home, daily routine.
+- Grammar scope: present tense, articles (der/die/das, ein/kein), personal pronouns, W-questions, basic main-clause word order, common prepositions, plurals, numbers.
+- Keep sentences short and concrete; stay strictly within A1 vocabulary.`,
+  A2: `Model the questions on the Goethe-Zertifikat A2 and telc Deutsch A2 exams:
+- Topics: work, travel, health, appointments, leisure, past experiences.
+- Grammar scope: Perfekt and Präteritum of common verbs, modal verbs, dative/accusative cases and prepositions, comparatives and superlatives, separable verbs, subordinate clauses with weil/dass/wenn.
+- Slightly longer sentences in a practical, everyday register.`,
+  B1: `Model the questions on the Goethe-Zertifikat B1 and telc Deutsch B1 exams:
+- Topics: opinions, plans, environment, media, relationships, and other everyday abstract matters.
+- Grammar scope: Konjunktiv II, passive voice, relative clauses, Genitiv, adjective declension, connectors (deshalb, trotzdem, obwohl, deswegen) and two-part connectors (entweder…oder, je…desto).
+- Use connected discourse and reasoning; the register may be more nuanced.`,
+};
+
+const LEVEL_BY_SECTION_PREFIX: Record<string, string> = {
+  "1": "A1",
+  "2": "A2",
+  "3": "B1",
+};
+
+// Derive a CEFR level from a section code like "1 01" (→ A1), "2 03" (→ A2).
+function levelFromSection(section: string): string | null {
+  const m = section.match(/^(\d+)\s+0*\d+$/);
+  if (!m) return null;
+  return LEVEL_BY_SECTION_PREFIX[m[1]] ?? null;
+}
+
+function stripJsonFences(text: string): string {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  return fenced ? fenced[1].trim() : trimmed;
+}
 
 function slugify(text: string): string {
   return text
@@ -63,7 +101,7 @@ function sliceLessonByTopicIds(markdown: string, topicIds: string[]): string {
   return result.join("\n");
 }
 
-const SYSTEM_PROMPT = `You are a language learning quiz generator.
+const SYSTEM_PROMPT = `You are an examiner who writes German-language quizzes in the style of standardized CEFR exams (Goethe-Zertifikat and telc).
 
 Output a single JSON object matching this exact shape (no markdown fences, no extra prose):
 
@@ -77,40 +115,54 @@ Output a single JSON object matching this exact shape (no markdown fences, no ex
 
 Rules:
 - EXACTLY ${QUIZ_QUESTION_COUNT} questions.
-- Mix types: roughly 3 true_false, 4 multiple_choice, 3 fill_blank.
-- All distractors in multiple_choice must be plausible (same word class / similar register).
+- Mix types to mirror exam task formats: roughly 3 true_false (Richtig/Falsch), 4 multiple_choice, 3 fill_blank (Lückentext).
+- Keep the tested material (sentences, texts, the blank's context) in the target language; short task instructions and explanations may be in the learner's language.
+- All distractors in multiple_choice must be plausible (same word class / similar register) — the kind an exam candidate could realistically confuse.
 - For fill_blank: the surrounding context must make the answer unambiguous; the answer is a single word.
-- Test understanding, usage, and common pitfalls — never trivia.
+- Match the topics, difficulty, and grammar scope of the requested exam level exactly — do not exceed it.
+- Test understanding, usage, and common exam pitfalls — never trivia.
 - Keep explanations concise and instructive.`;
 
 async function callAI(
-  messages: Array<{ role: "system" | "user"; content: string }>
+  systemPrompt: string,
+  userPrompt: string
 ): Promise<unknown> {
-  const res = await fetch(ENDPOINT, {
+  const res = await fetch(`${ENDPOINT}/${MODEL}:generateContent`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://recall-io.vercel.app",
-      "X-Title": "Recall Quiz",
+      "X-goog-api-key": process.env.GEMINI_API_KEY as string,
     },
     body: JSON.stringify({
-      model: MODEL,
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0.7,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: "application/json",
+        maxOutputTokens: 8192,
+        // gemini-flash-latest resolves to a thinking model; without this it
+        // spends the output budget on internal reasoning and can return empty
+        // or truncated JSON. Quiz generation doesn't need extended thinking.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     }),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`OpenRouter ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(`Gemini ${res.status}: ${text.slice(0, 300)}`);
   }
 
   const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("AI response empty");
-  return JSON.parse(content);
+  const parts = data?.candidates?.[0]?.content?.parts;
+  const content = Array.isArray(parts)
+    ? parts.map((p: { text?: string }) => p.text ?? "").join("")
+    : undefined;
+  if (typeof content !== "string" || content.trim() === "") {
+    const reason = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason;
+    throw new Error(`AI response empty${reason ? ` (${reason})` : ""}`);
+  }
+  return JSON.parse(stripJsonFences(content));
 }
 
 export async function POST(req: Request) {
@@ -119,11 +171,11 @@ export async function POST(req: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (!process.env.OPENROUTER_API_KEY) {
+    if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
         {
           error:
-            "OPENROUTER_API_KEY is not configured. Add it to your environment to enable AI quizzes.",
+            "GEMINI_API_KEY is not configured. Add it to your environment to enable AI quizzes.",
         },
         { status: 503 }
       );
@@ -144,7 +196,7 @@ export async function POST(req: Request) {
     const learnerLang =
       (userRow[0]?.translationLanguages as string[] | null)?.[0] ?? "English";
 
-    let messages: Array<{ role: "system" | "user"; content: string }>;
+    let userPrompt: string;
     let meta: QuizMeta;
 
     if (parsed.mode === "vocabulary") {
@@ -183,19 +235,20 @@ export async function POST(req: Request) {
         )
         .join("\n");
 
-      const userPrompt = `Generate a vocabulary quiz for a learner of ${mainLang} (their first language is ${learnerLang}).
+      const level =
+        parsed.sections.map(levelFromSection).find((l): l is string => l != null) ?? null;
+      const examNote = level
+        ? `\nTarget exam level: ${level}.\n${EXAM_STYLE[level]}\n`
+        : "";
 
-Write prompts and explanations in ${learnerLang}. The target words and example sentences should be in ${mainLang}.
+      userPrompt = `Generate a vocabulary quiz for a learner of ${mainLang} (their first language is ${learnerLang}).
+${examNote}
+Write task instructions and explanations in ${learnerLang}. The target words and example sentences must be in ${mainLang}.
 
 Words to practice (target — primary translation / secondary translation | example):
 ${wordList}
 
-Generate ${QUIZ_QUESTION_COUNT} questions following the JSON format. Focus on meaning, common usage, and (for nouns) gender/articles.`;
-
-      messages = [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ];
+Generate ${QUIZ_QUESTION_COUNT} questions following the JSON format. Focus on meaning, common usage, and (for nouns) gender/articles, in the style of the exam described above.`;
 
       meta = { mode: "vocabulary", sections: parsed.sections };
     } else {
@@ -227,9 +280,12 @@ Generate ${QUIZ_QUESTION_COUNT} questions following the JSON format. Focus on me
         ? "Cover the lesson broadly."
         : "Focus on the topic sections shown below.";
 
-      const userPrompt = `Generate a ${parsed.level} grammar quiz for a learner of ${mainLang} (first language: ${learnerLang}).
+      userPrompt = `Generate a ${parsed.level} grammar quiz for a learner of ${mainLang} (first language: ${learnerLang}).
 
-Write prompts and explanations in ${learnerLang}. Example sentences should be in ${mainLang}.
+Target exam level: ${parsed.level}.
+${EXAM_STYLE[parsed.level]}
+
+Write task instructions and explanations in ${learnerLang}. Example sentences and the tested material must be in ${mainLang}.
 
 ${focusNote}
 
@@ -238,12 +294,7 @@ Lesson content:
 ${trimmed}
 """
 
-Generate ${QUIZ_QUESTION_COUNT} questions following the JSON format. Test rule comprehension, application in a sentence, and common mistakes.`;
-
-      messages = [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ];
+Generate ${QUIZ_QUESTION_COUNT} questions following the JSON format. Test rule comprehension, application in a sentence, and common mistakes, in the style of the exam described above.`;
 
       meta = {
         mode: "grammar",
@@ -253,7 +304,7 @@ Generate ${QUIZ_QUESTION_COUNT} questions following the JSON format. Test rule c
       };
     }
 
-    const rawJson = await callAI(messages);
+    const rawJson = await callAI(SYSTEM_PROMPT, userPrompt);
     const validated = aiResponseSchema.safeParse(rawJson);
 
     if (!validated.success) {

@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy } from "lucide-react";
-import { parseBatchWords } from "@/lib/languages";
+import { Copy, Sparkles } from "lucide-react";
+import { parseBatchWords, buildGlossarFormatPrompt } from "@/lib/languages";
 import type { UserLanguagePreferences } from "@/lib/languages";
 
 // Define the form schema
@@ -48,6 +48,8 @@ export function BatchAddForm() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedWords, setParsedWords] = useState<ParsedWord[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [aiInput, setAiInput] = useState("");
+  const [isFormatting, setIsFormatting] = useState(false);
   const [section, setSection] = useState("");
   const [languagePrefs, setLanguagePrefs] = useState<UserLanguagePreferences | null>(null);
   const promptRef = useRef<HTMLSpanElement>(null);
@@ -95,6 +97,44 @@ export function BatchAddForm() {
     }
   };
 
+  const handleAIFormat = async () => {
+    const text = aiInput.trim();
+    if (!text) {
+      toast.error("Paste some words to format first.");
+      return;
+    }
+
+    try {
+      setIsFormatting(true);
+      const response = await fetch("/api/words/format", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to format words");
+      }
+
+      const formatted: string = result.formatted ?? "";
+      if (!formatted.trim()) {
+        throw new Error("AI returned no formatted words. Try again.");
+      }
+
+      // Drop the result into the manual textarea so the user can review/edit
+      form.setValue("words", formatted, { shouldValidate: true });
+      parseWords(formatted);
+      toast.success("Formatted with AI. Please review the result below before adding.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to format words. Please try again."
+      );
+    } finally {
+      setIsFormatting(false);
+    }
+  };
+
   const onSubmit = async (data: FormValues) => {
     if (!languagePrefs) {
       toast.error("Loading language preferences...");
@@ -138,6 +178,7 @@ export function BatchAddForm() {
         section: "",
       });
       setSection("");
+      setAiInput("");
       setParsedWords([]);
       setParseError(null);
 
@@ -198,25 +239,7 @@ export function BatchAddForm() {
               Prompt:
               <br />
               <span ref={promptRef} className="block whitespace-pre-line">
-                {`Generate a CSV translation list of ${languagePrefs.mainLanguage} words. Output each word on its own line in this exact format:
-
-"${languagePrefs.mainLanguage}","${languagePrefs.translationLanguages[1]}","${languagePrefs.translationLanguages[0]}","Example sentence"
-
-Rules:
-- Wrap every field in double quotes (").
-- Separate fields with a single comma. No spaces around the comma.
-- Output only the CSV lines — no headers, no numbering, no commentary.
-- Always include an example sentence in ${languagePrefs.mainLanguage}. If none is given, write a natural one using the word.
-- Nouns: include the article (der/die/das) and append the plural after a comma inside the same quoted field, e.g. "das Auto,s", "die Frau,en", "der Kindergarten,¨" (use ¨ for umlaut plurals like Kindergärten).
-- Verbs, adjectives, and all non-nouns: no plural extension.
-- If a word has multiple meanings, pick one clear translation.
-- Hyphens, dashes, slashes, and spaces inside fields are fine because fields are quoted (e.g. "low-priced" and "good day" are valid).
-- If a translation contains a literal double quote, escape it by doubling it: "".
-
-Example output:
-"das Auto,s","গাড়ি","car","Das Auto ist rot."
-"günstig","সস্তা","low-priced","Die Miete ist günstig."
-"guten Tag","শুভ দিন","good day","Guten Tag! Wie geht es Ihnen?"`}
+                {buildGlossarFormatPrompt(languagePrefs)}
               </span>
               <button
                 type="button"
@@ -229,6 +252,38 @@ Example output:
               </button>
             </AlertDescription>
           </Alert>
+
+          <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <Label htmlFor="ai-input" className="font-medium">
+                Format with AI
+              </Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Paste raw words from your Glossar (one per line, any format — no quotes or
+              commas needed). AI will translate and format them, then fill the box below so
+              you can review before adding.
+            </p>
+            <Textarea
+              id="ai-input"
+              placeholder={`Paste raw words, e.g.:\ndas Haus\ngünstig\nguten Tag`}
+              className="font-mono"
+              rows={5}
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              disabled={isFormatting}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleAIFormat}
+              disabled={isFormatting || !aiInput.trim()}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {isFormatting ? "Formatting..." : "Format with AI"}
+            </Button>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="words">Words</Label>
