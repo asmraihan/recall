@@ -143,7 +143,9 @@ async function callAI(
         // gemini-flash-latest resolves to a thinking model; without this it
         // spends the output budget on internal reasoning and can return empty
         // or truncated JSON. Quiz generation doesn't need extended thinking.
-        thinkingConfig: { thinkingBudget: 0 },
+        // Gemini 3+ uses thinkingLevel; the older thinkingBudget is rejected
+        // with a 400 INVALID_ARGUMENT.
+        thinkingConfig: { thinkingLevel: "low" },
       },
     }),
   });

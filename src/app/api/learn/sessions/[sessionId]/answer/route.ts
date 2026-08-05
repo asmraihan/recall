@@ -1,68 +1,49 @@
-//@ts-nocheck
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { learningProgress, sessionWords, learningSessions } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
-
-// Simple spaced repetition intervals (in days)
-const intervals = [1, 3, 7, 14, 30, 60];
+import { nextState } from "@/lib/spaced-repetition";
 
 export async function POST(req: Request, context: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await context.params;
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-    const { wordId, isCorrect } = await req.json();
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
+    const body = await req.json();
+    const wordId: string = body?.wordId;
+    const isCorrect: boolean = body?.isCorrect;
     if (!wordId || typeof isCorrect !== "boolean") {
       return new NextResponse("Missing wordId or isCorrect", { status: 400 });
     }
 
-    // Fetch the session to get the direction
+    // Fetch the session to get the direction. Scoping to the caller is what
+    // stops anyone posting answers into someone else's session and corrupting
+    // their learning_progress.
     const [learningSession] = await db
       .select({ direction: learningSessions.direction })
       .from(learningSessions)
-      .where(eq(learningSessions.id, sessionId));
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.userId, auth.userId)
+        )
+      );
+    if (!learningSession) {
+      return new NextResponse("Session not found", { status: 404 });
+    }
     // Use generic default direction (main_to_trans1) instead of hardcoded language
-    const preferredDirection = learningSession?.direction || "main_to_trans1";
+    const preferredDirection = learningSession.direction || "main_to_trans1";
 
     // Get or create learning_progress row
     const [progress] = await db
       .select()
       .from(learningProgress)
-      .where(and(eq(learningProgress.userId, session.user.id), eq(learningProgress.wordId, wordId)));
-    let masteryLevel = 0;
-    let correctAttempts = 0;
-    let incorrectAttempts = 0;
-    const nextReviewDate = new Date();
-    if (progress) {
-      masteryLevel = progress.masteryLevel;
-      correctAttempts = progress.correctAttempts;
-      incorrectAttempts = progress.incorrectAttempts;
-    }
-    if (isCorrect) {
-      // If this is the first correct answer (no previous attempts), set mastery level to 1
-      if (correctAttempts === 0 && incorrectAttempts === 0) {
-        masteryLevel = 1;
-      } else {
-        // Otherwise increment mastery level if the ratio of correct to total attempts is good
-        const totalAttempts = correctAttempts + incorrectAttempts;
-        const correctRatio = correctAttempts / totalAttempts;
-        if (correctRatio >= 0.7) { // If 70% or more answers are correct
-          masteryLevel = Math.min(masteryLevel + 1, intervals.length);
-        }
-      }
-      correctAttempts++;
-    } else {
-      masteryLevel = Math.max(masteryLevel - 1, 0);
-      incorrectAttempts++;
-    }
-    // Calculate next review date
-    const intervalDays = intervals[masteryLevel] || intervals[intervals.length - 1];
-    nextReviewDate.setDate(nextReviewDate.getDate() + intervalDays);
+      .where(and(eq(learningProgress.userId, auth.userId), eq(learningProgress.wordId, wordId)));
+    // The schedule now lives in one place so /api/mobile/answers can't drift
+    // from it. Behaviour is byte-for-byte what this handler did inline.
+    const { masteryLevel, correctAttempts, incorrectAttempts, nextReviewDate } =
+      nextState(progress ?? null, isCorrect);
 
     if (progress) {
       await db.update(learningProgress)
@@ -76,7 +57,7 @@ export async function POST(req: Request, context: { params: Promise<{ sessionId:
         .where(eq(learningProgress.id, progress.id));
     } else {
       await db.insert(learningProgress).values({
-        userId: session.user.id,
+        userId: auth.userId,
         wordId,
         masteryLevel,
         correctAttempts,

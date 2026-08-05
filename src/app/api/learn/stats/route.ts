@@ -1,30 +1,27 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { learningProgress, words, learningSessions } from "@/lib/db/schema";
 import { eq, and, sql, count, avg } from "drizzle-orm";
 
 // GET /api/learn/stats - Get learning statistics
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     // Get total words and mastered words
     const [totalWords, masteredWords] = await Promise.all([
       db
         .select({ count: count() })
         .from(words)
-        .where(eq(words.createdBy, session.user.id)),
+        .where(eq(words.createdBy, auth.userId)),
       db
         .select({ count: count() })
         .from(learningProgress)
         .where(
           and(
-            eq(learningProgress.userId, session.user.id),
+            eq(learningProgress.userId, auth.userId),
             sql`${learningProgress.masteryLevel} >= 3`
           )
         ),
@@ -36,7 +33,7 @@ export async function GET() {
       .from(learningProgress)
       .where(
         and(
-          eq(learningProgress.userId, session.user.id),
+          eq(learningProgress.userId, auth.userId),
           sql`${learningProgress.nextReviewDate} <= NOW()`
         )
       );
@@ -49,7 +46,7 @@ export async function GET() {
       .from(learningSessions)
       .where(
         and(
-          eq(learningSessions.userId, session.user.id),
+          eq(learningSessions.userId, auth.userId),
           eq(learningSessions.status, "completed")
         )
       )
@@ -93,7 +90,7 @@ export async function GET() {
       .from(learningSessions)
       .where(
         and(
-          eq(learningSessions.userId, session.user.id),
+          eq(learningSessions.userId, auth.userId),
           eq(learningSessions.status, "completed")
         )
       );
@@ -112,10 +109,10 @@ export async function GET() {
         learningProgress,
         and(
           eq(learningProgress.wordId, words.id),
-          eq(learningProgress.userId, session.user.id)
+          eq(learningProgress.userId, auth.userId)
         )
       )
-      .where(eq(words.createdBy, session.user.id))
+      .where(eq(words.createdBy, auth.userId))
       .groupBy(words.section)
       .orderBy(words.section);
 

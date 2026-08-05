@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -13,16 +12,11 @@ const languagePreferencesSchema = z.object({
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const user = await db.query.users.findFirst({
-      where: eq(users.id, session.user.id),
+      where: eq(users.id, auth.userId),
     });
 
     if (!user) {
@@ -47,13 +41,8 @@ export async function GET(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const body = await req.json();
     const validatedData = languagePreferencesSchema.parse(body);
@@ -65,7 +54,7 @@ export async function PUT(req: Request) {
         translationLanguages: validatedData.translationLanguages,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, auth.userId))
       .returning();
 
     return NextResponse.json({

@@ -31,7 +31,9 @@ export const config = {
     "/dashboard/:path*",
     "/words/:path*",
     "/profile/:path*",
-    "/api/words/:path*",
-    "/api/user/:path*",
+    // API routes are deliberately NOT matched: withAuth 302-redirects to an
+    // HTML sign-in page, which is wrong for XHR (the browser then gets a 200
+    // with an HTML body and blows up on .json()) and fatal for the mobile
+    // client. Every handler under /api/** performs its own requireUser() check.
   ],
-}; 
+};

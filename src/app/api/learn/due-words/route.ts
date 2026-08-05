@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { learningProgress, words } from "@/lib/db/schema";
 import { eq, sql, and, inArray } from "drizzle-orm";
 
 // GET /api/learn/due-words - Get words due for review
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     // Find word IDs due for review
     const dueWordIds = await db
@@ -19,7 +16,7 @@ export async function GET() {
       .from(learningProgress)
       .where(
         and(
-          eq(learningProgress.userId, session.user.id),
+          eq(learningProgress.userId, auth.userId),
           sql`${learningProgress.nextReviewDate} <= NOW()`
         )
       );
@@ -42,7 +39,7 @@ export async function GET() {
       .from(words)
       .where(
         and(
-          eq(words.createdBy, session.user.id),
+          eq(words.createdBy, auth.userId),
           inArray(words.id, dueIdsArray)
         )
       );

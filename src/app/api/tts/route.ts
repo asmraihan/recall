@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Communicate, listVoices } from 'edge-tts-universal';
+import { requireUser } from '@/lib/api-auth';
 
 
 // get all available voices
+// Authenticated: leaving this open turns a documented API surface into a free
+// TTS proxy. Every existing caller sits on a signed-in /dashboard page.
 
 export async function GET(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const voices = await listVoices();
     return NextResponse.json({ voices });
@@ -32,6 +38,9 @@ function normalizeParam(value: unknown, pattern: RegExp, fallback: string): stri
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { text, voice, rate, volume, pitch } = await request.json();
 

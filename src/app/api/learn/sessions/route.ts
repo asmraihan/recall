@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { learningSessions, sessionWords, words, learningProgress } from "@/lib/db/schema";
 import { eq, and, sql, desc, inArray, notInArray } from "drizzle-orm";
@@ -16,10 +15,8 @@ interface Word {
 // POST /api/learn/sessions - Start a new learning session
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const { type, direction, sections, wordCount, sourceSessionId } = await req.json();
 
@@ -61,7 +58,7 @@ export async function POST(req: Request) {
           .from(learningProgress)
           .where(
             and(
-              eq(learningProgress.userId, session.user.id),
+              eq(learningProgress.userId, auth.userId),
               sql`${learningProgress.nextReviewDate} <= NOW()`
             )
           );
@@ -80,7 +77,7 @@ export async function POST(req: Request) {
             .from(words)
             .where(
               and(
-                eq(words.createdBy, session.user.id),
+                eq(words.createdBy, auth.userId),
                 inArray(words.id, dueWordIds),
                 sectionFilter(words.section)
               )
@@ -96,7 +93,7 @@ export async function POST(req: Request) {
         const learnedWords = await db
           .select({ wordId: learningProgress.wordId })
           .from(learningProgress)
-          .where(eq(learningProgress.userId, session.user.id));
+          .where(eq(learningProgress.userId, auth.userId));
         const learnedWordIds = learnedWords.map((w) => w.wordId);
         
         wordsToLearn = await db
@@ -110,7 +107,7 @@ export async function POST(req: Request) {
           .from(words)
           .where(
             and(
-              eq(words.createdBy, session.user.id),
+              eq(words.createdBy, auth.userId),
               learnedWordIds.length > 0 ? notInArray(words.id, learnedWordIds) : sql`TRUE`,
               sectionFilter(words.section)
             )
@@ -135,7 +132,7 @@ export async function POST(req: Request) {
           .from(learningProgress)
           .where(
             and(
-              eq(learningProgress.userId, session.user.id),
+              eq(learningProgress.userId, auth.userId),
               sql`(
                 ${learningProgress.masteryLevel} < 3 
                 AND (
@@ -162,7 +159,7 @@ export async function POST(req: Request) {
             .from(words)
             .where(
               and(
-                eq(words.createdBy, session.user.id),
+                eq(words.createdBy, auth.userId),
                 inArray(words.id, mistakeWordIds),
                 sectionFilter(words.section)
               )
@@ -186,7 +183,7 @@ export async function POST(req: Request) {
           .from(words)
           .where(
             and(
-              eq(words.createdBy, session.user.id),
+              eq(words.createdBy, auth.userId),
               eq(words.important, true),
               sectionFilter(words.section)
             )
@@ -208,7 +205,7 @@ export async function POST(req: Request) {
           .from(words)
           .where(
             and(
-              eq(words.createdBy, session.user.id),
+              eq(words.createdBy, auth.userId),
               sectionFilter(words.section)
             )
           )
@@ -244,7 +241,7 @@ export async function POST(req: Request) {
             .from(words)
             .where(
               and(
-                eq(words.createdBy, session.user.id),
+                eq(words.createdBy, auth.userId),
                 inArray(words.id, wrongWordIds)
               )
             )
@@ -270,7 +267,7 @@ export async function POST(req: Request) {
           .from(words)
           .where(
             and(
-              eq(words.createdBy, session.user.id),
+              eq(words.createdBy, auth.userId),
               sectionFilter(words.section)
             )
           )
@@ -291,7 +288,7 @@ export async function POST(req: Request) {
     const sessionId = crypto.randomUUID();
     await db.insert(learningSessions).values({
       id: sessionId,
-      userId: session.user.id,
+      userId: auth.userId,
       sessionType: type,
       direction,
       sections: sessionSections,
@@ -323,12 +320,10 @@ export async function POST(req: Request) {
 }
 
 // GET /api/learn/sessions/recent - Get recent learning sessions
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const recentSessions = await db
       .select({
@@ -344,7 +339,7 @@ export async function GET() {
         sections: learningSessions.sections, // include all sections
       })
       .from(learningSessions)
-      .where(eq(learningSessions.userId, session.user.id))
+      .where(eq(learningSessions.userId, auth.userId))
       .orderBy(desc(learningSessions.startedAt))
       .limit(20);
 

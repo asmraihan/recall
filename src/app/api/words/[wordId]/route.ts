@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { words } from "@/lib/db/schema";
@@ -21,15 +20,10 @@ const wordSchema = z.object({
 
 export async function GET(req: Request, context: { params: Promise<{ wordId: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
     const { wordId } = await context.params;
-    const [word] = await db.select().from(words).where(and(eq(words.id, wordId), eq(words.createdBy, session.user.id)));
+    const [word] = await db.select().from(words).where(and(eq(words.id, wordId), eq(words.createdBy, auth.userId)));
     if (!word) {
       return new NextResponse(JSON.stringify({ error: "Word not found" }), {
         status: 404,
@@ -51,19 +45,14 @@ export async function GET(req: Request, context: { params: Promise<{ wordId: str
 export async function PATCH( req: Request,
   context: { params: Promise<{ wordId: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
     const { wordId } = await context.params;
     const body = await req.json();
     const validatedData = wordSchema.parse(body);
 
     // Only allow editing user's own word
-    const [existing] = await db.select().from(words).where(and(eq(words.id, wordId), eq(words.createdBy, session.user.id)));
+    const [existing] = await db.select().from(words).where(and(eq(words.id, wordId), eq(words.createdBy, auth.userId)));
     if (!existing) {
       return new NextResponse(JSON.stringify({ error: "Word not found" }), {
         status: 404,
@@ -73,7 +62,7 @@ export async function PATCH( req: Request,
 
     const updated = await db.update(words)
       .set({ ...validatedData })
-      .where(and(eq(words.id, wordId), eq(words.createdBy, session.user.id)))
+      .where(and(eq(words.id, wordId), eq(words.createdBy, auth.userId)))
       .returning();
 
     return NextResponse.json({ ...updated[0], message: "Word updated successfully" });
@@ -98,13 +87,8 @@ export async function DELETE(
   context: { params: Promise<{ wordId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), { 
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const { wordId } = await context.params;
 
@@ -114,7 +98,7 @@ export async function DELETE(
       .where(
         and(
           eq(words.id, wordId),
-          eq(words.createdBy, session.user.id)
+          eq(words.createdBy, auth.userId)
         )
       )
       .returning();

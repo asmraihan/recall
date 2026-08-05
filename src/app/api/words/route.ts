@@ -1,6 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { words, learningProgress } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -20,13 +19,8 @@ const wordSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const body = await req.json();
     const validatedData = wordSchema.parse(body);
@@ -34,7 +28,7 @@ export async function POST(req: Request) {
     // Check for duplicate (same mainWord AND same section for this user)
     const existing = await db.select().from(words).where(
       and(
-        eq(words.createdBy, session.user.id),
+        eq(words.createdBy, auth.userId),
         eq(words.mainWord, validatedData.mainWord),
         eq(words.section, validatedData.section)
       )
@@ -53,7 +47,7 @@ export async function POST(req: Request) {
       exampleSentence: validatedData.exampleSentence,
       notes: validatedData.notes,
       section: validatedData.section,
-      createdBy: session.user.id,
+      createdBy: auth.userId,
     }).returning();
 
     return NextResponse.json({
@@ -77,13 +71,8 @@ export async function POST(req: Request) {
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const { searchParams } = new URL(req.url);
     const sectionParam = searchParams.get("section");
@@ -112,9 +101,9 @@ export async function GET(req: NextRequest) {
 
     let whereCondition;
     if (sectionParam && sectionParam !== "all") {
-      whereCondition = and(eq(words.createdBy, session.user.id), eq(words.section, sectionParam));
+      whereCondition = and(eq(words.createdBy, auth.userId), eq(words.section, sectionParam));
     } else {
-      whereCondition = eq(words.createdBy, session.user.id);
+      whereCondition = eq(words.createdBy, auth.userId);
     }
 
     userWords = await db
@@ -136,7 +125,7 @@ export async function GET(req: NextRequest) {
         .from(learningProgress)
         .where(
           and(
-            eq(learningProgress.userId, session.user.id),
+            eq(learningProgress.userId, auth.userId),
             sql`(
               ${learningProgress.masteryLevel} < 3
               AND (

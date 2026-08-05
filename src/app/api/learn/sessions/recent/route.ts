@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { learningSessions } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const recentSessions = await db
       .select({
@@ -26,7 +23,7 @@ export async function GET() {
         sections: learningSessions.sections, // include all sections
       })
       .from(learningSessions)
-      .where(eq(learningSessions.userId, session.user.id))
+      .where(eq(learningSessions.userId, auth.userId))
       .orderBy(desc(learningSessions.startedAt))
       .limit(20);
 

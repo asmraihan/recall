@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { words } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), { 
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     // Get distinct sections for the user's words
     const sections = await db
@@ -21,7 +15,7 @@ export async function GET() {
         section: words.section
       })
       .from(words)
-      .where(eq(words.createdBy, session.user.id))
+      .where(eq(words.createdBy, auth.userId))
       .groupBy(words.section)
       // Ensure sections are ordered by createdAt
       // .orderBy(sql` MIN(${words.createdAt})`)

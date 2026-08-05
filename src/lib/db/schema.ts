@@ -99,8 +99,38 @@ export const sessionWords = pgTable('session_words', {
   answeredAt: timestamp('answered_at'),
   // Order in which the word was presented
   presentationOrder: integer('presentation_order').notNull(),
+  // Idempotency key for batch answer sync from the mobile offline queue and
+  // the home-screen widget. Null for answers written by the web app.
+  clientEventId: text('client_event_id'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Opaque, rotating refresh tokens for the mobile app. Stored as SHA-256
+// hashes, grouped into families so that replay of a rotated token can burn
+// every descendant at once.
+export const mobileRefreshTokens = pgTable('mobile_refresh_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(), // sha256 hex
+  familyId: uuid('family_id').notNull(), // rotation chain
+  familyStartedAt: timestamp('family_started_at').notNull().defaultNow(),
+  deviceId: text('device_id'), // client install uuid
+  deviceName: text('device_name'), // for a future "signed-in devices" screen
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at'),
+  revokedAt: timestamp('revoked_at'),
+  supersededAt: timestamp('superseded_at'), // set on normal rotation
+});
+
+// Fixed-window counters for login throttling. See src/lib/rate-limit.ts.
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').primaryKey(),
+  count: integer('count').notNull().default(0),
+  windowStart: timestamp('window_start').notNull().defaultNow(),
 });
 
 // Relations

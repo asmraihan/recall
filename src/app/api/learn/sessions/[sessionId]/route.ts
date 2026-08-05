@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { learningSessions, sessionWords, words, learningProgress } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -10,10 +9,8 @@ export async function GET(
   context: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
 
     const { sessionId } = await context.params;
     // Fetch the session
@@ -23,7 +20,7 @@ export async function GET(
       .where(
         and(
           eq(learningSessions.id, sessionId),
-          eq(learningSessions.userId, session.user.id)
+          eq(learningSessions.userId, auth.userId)
         )
       );
     if (!learningSession) {
@@ -52,7 +49,7 @@ export async function GET(
         important: words.important,
       })
       .from(words)
-      .where(and(eq(words.createdBy, session.user.id), eqAny(words.id, wordIds)));
+      .where(and(eq(words.createdBy, auth.userId), eqAny(words.id, wordIds)));
     // Sort words by presentationOrder and merge answer state
     const wordOrderMap = Object.fromEntries(sessionWordRows.map((row) => [row.wordId, row.presentationOrder]));
     const answerMap = Object.fromEntries(sessionWordRows.map((row) => [row.wordId, { isCorrect: row.isCorrect, answeredAt: row.answeredAt }]));
