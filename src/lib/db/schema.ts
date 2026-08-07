@@ -126,6 +126,29 @@ export const mobileRefreshTokens = pgTable('mobile_refresh_tokens', {
   supersededAt: timestamp('superseded_at'), // set on normal rotation
 });
 
+/**
+ * Idempotency ledger for answers that are NOT part of a session.
+ *
+ * Home-screen widget answers update the spaced-repetition schedule but must
+ * not appear in Recent Sessions, so they create no `learning_sessions` row —
+ * which means they cannot use `session_words.client_event_id` as their
+ * dedupe key, because that column hangs off a session. This table is that key.
+ *
+ * Without it the widget's known read-modify-write race on its event queue
+ * would double-apply attempts and quietly corrupt the review schedule.
+ */
+export const mobileAnswerEvents = pgTable('mobile_answer_events', {
+  clientEventId: text('client_event_id').primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  wordId: uuid('word_id').notNull(),
+  isCorrect: boolean('is_correct').notNull(),
+  answeredAt: timestamp('answered_at').notNull(),
+  source: text('source').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 // Fixed-window counters for login throttling. See src/lib/rate-limit.ts.
 export const rateLimits = pgTable('rate_limits', {
   key: text('key').primaryKey(),

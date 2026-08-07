@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import {
   learningProgress,
   learningSessions,
+  mobileAnswerEvents,
   sessionWords,
   words,
 } from '@/lib/db/schema';
@@ -66,15 +67,20 @@ export async function POST(req: Request) {
 
     // 1. Already applied? Anything whose client_event_id is on file is a
     //    duplicate, not an error.
-    const existing = await db
-      .select({ clientEventId: sessionWords.clientEventId })
-      .from(sessionWords)
-      .where(
-        inArray(
-          sessionWords.clientEventId,
-          answers.map((a) => a.clientEventId)
-        )
-      );
+    //
+    //    Widget answers create no session, so their key lives in
+    //    mobile_answer_events rather than on session_words.
+    const eventIds = answers.map((a) => a.clientEventId);
+    const existing =
+      source === 'widget'
+        ? await db
+            .select({ clientEventId: mobileAnswerEvents.clientEventId })
+            .from(mobileAnswerEvents)
+            .where(inArray(mobileAnswerEvents.clientEventId, eventIds))
+        : await db
+            .select({ clientEventId: sessionWords.clientEventId })
+            .from(sessionWords)
+            .where(inArray(sessionWords.clientEventId, eventIds));
     const applied = new Set(existing.map((r) => r.clientEventId as string));
     let duplicates = applied.size;
 
@@ -111,46 +117,78 @@ export async function POST(req: Request) {
       });
     }
 
-    // 3. One completed session per batch, so widget/offline activity shows up
-    //    in Recent Sessions and counts toward the streak.
     const direction = toApply.find((a) => a.direction)?.direction ?? 'main_to_trans1';
-    const startedAt = new Date(Math.min(...toApply.map((a) => a.answeredAt)) * 1000);
-    const completedAt = new Date(Math.max(...toApply.map((a) => a.answeredAt)) * 1000);
 
-    const [created] = await db
-      .insert(learningSessions)
-      .values({
-        userId,
-        sessionType: source,
-        direction,
-        sections: [],
-        status: 'completed',
-        totalWords: toApply.length,
-        correctAnswers: toApply.filter((a) => a.isCorrect).length,
-        incorrectAnswers: toApply.filter((a) => !a.isCorrect).length,
-        startedAt,
-        completedAt,
-      })
-      .returning({ id: learningSessions.id });
+    // 3. Record the answers.
+    //
+    //    WIDGET answers deliberately create no session. They still drive the
+    //    spaced-repetition schedule, but home-screen activity should not show
+    //    up as an entry in Recent Sessions. The consequence to be aware of:
+    //    the streak counts days with a COMPLETED SESSION, so a day spent only
+    //    on the widget does not extend it.
+    //
+    //    OFFLINE answers are the tail of a real session the user was in, so
+    //    they still produce one, which is also what makes them visible in
+    //    history and keeps the streak intact.
+    let createdSessionId: string | null = null;
+    let landed: Set<string>;
 
-    const inserted = await db
-      .insert(sessionWords)
-      .values(
-        toApply.map((a, i) => ({
-          sessionId: created.id,
-          wordId: a.wordId,
-          isCorrect: a.isCorrect,
-          answeredAt: new Date(a.answeredAt * 1000),
-          presentedAt: new Date(a.answeredAt * 1000),
-          presentationOrder: i + 1,
-          clientEventId: a.clientEventId,
-        }))
-      )
-      // Safety net for a batch replayed concurrently with this one.
-      .onConflictDoNothing()
-      .returning({ clientEventId: sessionWords.clientEventId });
+    if (source === 'widget') {
+      const inserted = await db
+        .insert(mobileAnswerEvents)
+        .values(
+          toApply.map((a) => ({
+            clientEventId: a.clientEventId,
+            userId,
+            wordId: a.wordId,
+            isCorrect: a.isCorrect,
+            answeredAt: new Date(a.answeredAt * 1000),
+            source,
+          }))
+        )
+        // Safety net for a batch replayed concurrently with this one.
+        .onConflictDoNothing()
+        .returning({ clientEventId: mobileAnswerEvents.clientEventId });
+      landed = new Set(inserted.map((r) => r.clientEventId));
+    } else {
+      const startedAt = new Date(Math.min(...toApply.map((a) => a.answeredAt)) * 1000);
+      const completedAt = new Date(Math.max(...toApply.map((a) => a.answeredAt)) * 1000);
 
-    const landed = new Set(inserted.map((r) => r.clientEventId as string));
+      const [created] = await db
+        .insert(learningSessions)
+        .values({
+          userId,
+          sessionType: source,
+          direction,
+          sections: [],
+          status: 'completed',
+          totalWords: toApply.length,
+          correctAnswers: toApply.filter((a) => a.isCorrect).length,
+          incorrectAnswers: toApply.filter((a) => !a.isCorrect).length,
+          startedAt,
+          completedAt,
+        })
+        .returning({ id: learningSessions.id });
+      createdSessionId = created.id;
+
+      const inserted = await db
+        .insert(sessionWords)
+        .values(
+          toApply.map((a, i) => ({
+            sessionId: created.id,
+            wordId: a.wordId,
+            isCorrect: a.isCorrect,
+            answeredAt: new Date(a.answeredAt * 1000),
+            presentedAt: new Date(a.answeredAt * 1000),
+            presentationOrder: i + 1,
+            clientEventId: a.clientEventId,
+          }))
+        )
+        .onConflictDoNothing()
+        .returning({ clientEventId: sessionWords.clientEventId });
+      landed = new Set(inserted.map((r) => r.clientEventId as string));
+    }
+
     duplicates += toApply.length - landed.size;
     const effective = toApply.filter((a) => landed.has(a.clientEventId));
 
@@ -205,7 +243,7 @@ export async function POST(req: Request) {
       }
 
       // Re-align the session counters with what actually landed.
-      if (effective.length !== toApply.length) {
+      if (createdSessionId && effective.length !== toApply.length) {
         await db
           .update(learningSessions)
           .set({
@@ -213,7 +251,7 @@ export async function POST(req: Request) {
             correctAnswers: effective.filter((a) => a.isCorrect).length,
             incorrectAnswers: effective.filter((a) => !a.isCorrect).length,
           })
-          .where(eq(learningSessions.id, created.id));
+          .where(eq(learningSessions.id, createdSessionId));
       }
     }
 
@@ -221,7 +259,7 @@ export async function POST(req: Request) {
       applied: effective.length,
       duplicates,
       rejected,
-      sessionId: created.id,
+      ...(createdSessionId ? { sessionId: createdSessionId } : {}),
       stats: await freshStats(userId),
     });
   } catch (error) {
