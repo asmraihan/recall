@@ -24,12 +24,12 @@ export default async function LessonsIndexPage() {
           {lessons.map((lesson) => (
             <Link key={lesson.slug} href={`/dashboard/lessons/${lesson.slug}`} className="group block">
               <Card className="transition-colors group-hover:bg-accent/40 overflow-hidden">
-                <CardContent className="flex items-center gap-4 p-4 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <CardContent className="flex items-center gap-4 ">
+                  <div className="flex shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <BookText className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{lesson.title}</div>
+                    <div className="font-medium  text-sm ">{lesson.title}</div>
                     <div className="text-xs text-muted-foreground truncate">
                       {lesson.filename}
                     </div>

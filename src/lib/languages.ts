@@ -168,47 +168,71 @@ function parseCSVLine(line: string): { fields: string[] } | { error: string } {
  * Parse batch import words based on user language preferences.
  * Format per line: "<main>","<trans2>","<trans1>","<sentence?>"
  */
+/** A single unparseable line, with the info needed to locate it in the source text. */
+export interface BatchParseIssue {
+  /** 1-based line number in the ORIGINAL text, including blank lines. */
+  line: number;
+  /** Short description, e.g. "expected ',' at column 39". */
+  message: string;
+  /** 1-based column the parser choked on, when known. */
+  column: number | null;
+  /** The offending line, trimmed. */
+  text: string;
+}
+
 export function parseBatchWords(
   text: string,
   pattern: string,
   section: string,
   prefs: UserLanguagePreferences
 ) {
-  const lines = text
+  // Keep the ORIGINAL line numbers: blank lines are skipped for parsing but
+  // still counted, so reported line numbers match the user's textarea exactly.
+  const entries = text
     .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
+    .map((line, index) => ({ text: line.trim(), line: index + 1 }))
+    .filter(entry => entry.text.length > 0);
 
   const words: any[] = [];
   const errors: string[] = [];
+  const issues: BatchParseIssue[] = [];
 
   const expected = `"${prefs.mainLanguage}","${prefs.translationLanguages[1]}","${prefs.translationLanguages[0]}","[optional sentence]"`;
 
-  lines.forEach((line, index) => {
+  const fail = (line: number, text: string, message: string, withExpected = true) => {
+    const column = message.match(/at column (\d+)/)?.[1];
+    issues.push({
+      line,
+      message,
+      column: column ? Number(column) : null,
+      text,
+    });
+    errors.push(
+      `Line ${line}: ${message}.\n` +
+      (withExpected ? `Expected: ${expected}\n` : '') +
+      `Got: ${text}`
+    );
+  };
+
+  entries.forEach(({ text: line, line: lineNumber }) => {
     const result = parseCSVLine(line);
     if ('error' in result) {
-      errors.push(
-        `Line ${index + 1}: ${result.error}.\n` +
-        `Expected: ${expected}\n` +
-        `Got: ${line}`
-      );
+      fail(lineNumber, line, result.error);
       return;
     }
 
     const { fields } = result;
     if (fields.length < 3 || fields.length > 4) {
-      errors.push(
-        `Line ${index + 1}: expected 3 or 4 fields, got ${fields.length}.\n` +
-        `Expected: ${expected}\n` +
-        `Got: ${line}`
-      );
+      fail(lineNumber, line, `expected 3 or 4 fields, got ${fields.length}`);
       return;
     }
 
     if (!fields[0] || !fields[1] || !fields[2]) {
-      errors.push(
-        `Line ${index + 1}: ${prefs.mainLanguage}, ${prefs.translationLanguages[1]}, and ${prefs.translationLanguages[0]} are required.\n` +
-        `Got: ${line}`
+      fail(
+        lineNumber,
+        line,
+        `${prefs.mainLanguage}, ${prefs.translationLanguages[1]}, and ${prefs.translationLanguages[0]} are required`,
+        false
       );
       return;
     }
@@ -222,7 +246,7 @@ export function parseBatchWords(
     });
   });
 
-  return { words, errors };
+  return { words, errors, issues };
 }
 
 /**
