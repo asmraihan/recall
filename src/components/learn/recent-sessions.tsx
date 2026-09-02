@@ -1,8 +1,18 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -44,7 +54,11 @@ function getDirectionLabel(direction: string, prefs: UserLanguagePreferences | n
 
 export function RecentSessions() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [languagePrefs, setLanguagePrefs] = useState<UserLanguagePreferences | null>(null);
+  /** The session awaiting confirmation. Deleting history is not undoable, so
+   *  it is never a single click. */
+  const [pendingDelete, setPendingDelete] = useState<Session | null>(null);
 
   // Fetch user language preferences on mount
   useEffect(() => {
@@ -72,6 +86,23 @@ export function RecentSessions() {
     },
     refetchOnWindowFocus: false,
     refetchInterval: 60000, // Only refetch every 60 seconds
+  });
+
+  const deleteSession = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/learn/sessions/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Failed to delete session");
+      return response.json();
+    },
+    onSuccess: () => {
+      // Stats and the streak both count completed sessions, so they are stale
+      // the moment one is removed.
+      queryClient.invalidateQueries({ queryKey: ["recent-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["learning-stats"] });
+      setPendingDelete(null);
+      toast.success("Session deleted");
+    },
+    onError: () => toast.error("Could not delete that session"),
   });
 
 
@@ -110,7 +141,7 @@ export function RecentSessions() {
         {sessions.map((session) => (
           <div
             key={session.id}
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-3 bg-card shadow-sm cursor-pointer hover:bg-accent/60 transition"
+            className="group flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border p-3 bg-card shadow-sm cursor-pointer hover:bg-accent/60 transition"
             onClick={() => {
               router.push(`/dashboard/learn/session/${session.id}`);
             }}
@@ -140,23 +171,78 @@ export function RecentSessions() {
                 )}
               </div>
             </div>
-            <div className="flex flex-col items-end min-w-[90px]">
-              {session.completedAt ? (
-                <>
-                  <span className="font-semibold text-sm">
-                    {session.correctAnswers}/{session.totalWords} correct
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {Math.round(session.accuracy * 100)}% accuracy
-                  </span>
-                </>
-              ) : (
-                <span className="text-xs text-primary font-semibold">In progress</span>
-              )}
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <div className="flex flex-col items-end min-w-[90px]">
+                {session.completedAt ? (
+                  <>
+                    <span className="font-semibold text-sm">
+                      {session.correctAnswers}/{session.totalWords} correct
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {Math.round(session.accuracy * 100)}% accuracy
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs text-primary font-semibold">In progress</span>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Delete this session"
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={(event) => {
+                  // The row itself opens the session; without this the delete
+                  // button would navigate away as it opened the dialog.
+                  event.stopPropagation();
+                  setPendingDelete(session);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         ))}
       </div>
+
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this session?</DialogTitle>
+            <DialogDescription>
+              This removes the session from your history. Your review schedule
+              and mastery levels are not affected — only the record of this
+              sitting is deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPendingDelete(null)}
+              disabled={deleteSession.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteSession.isPending}
+              onClick={() => pendingDelete && deleteSession.mutate(pendingDelete.id)}
+            >
+              {deleteSession.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ScrollArea>
   );
 }

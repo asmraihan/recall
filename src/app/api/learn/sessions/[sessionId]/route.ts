@@ -67,3 +67,51 @@ export async function GET(
 // Helper for eqAny (inArray)
 import { inArray } from "drizzle-orm";
 const eqAny = inArray;
+/**
+ * Removes one session from history.
+ *
+ * Deliberately does NOT touch `learning_progress`. Spaced-repetition state is
+ * cumulative across every session a word has ever appeared in, so there is no
+ * "the part this session contributed" to subtract — reverting it would mean
+ * discarding review history the user never asked to lose. Deleting a session
+ * removes the record of the sitting, not what was learned in it.
+ *
+ * `neon-http` has no transactions, so the child rows go first: a failure
+ * between the two statements leaves a session with no words, which still
+ * renders, rather than orphaned rows pointing at a session that is gone.
+ */
+export async function DELETE(
+  req: Request,
+  context: { params: Promise<{ sessionId: string }> }
+) {
+  try {
+    const auth = await requireUser(req);
+    if (auth instanceof NextResponse) return auth;
+
+    const { sessionId } = await context.params;
+
+    // Ownership is checked before anything is deleted, and the check is part
+    // of the same query rather than a separate read — another user's session
+    // id must be indistinguishable from one that does not exist.
+    const [owned] = await db
+      .select({ id: learningSessions.id })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.userId, auth.userId)
+        )
+      );
+    if (!owned) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    await db.delete(sessionWords).where(eq(sessionWords.sessionId, sessionId));
+    await db.delete(learningSessions).where(eq(learningSessions.id, sessionId));
+
+    return NextResponse.json({ deleted: sessionId });
+  } catch (error) {
+    console.error("[LEARN_SESSION_DELETE]", error);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}
