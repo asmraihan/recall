@@ -3,13 +3,14 @@
 import { useEffect, useState, useOptimistic, useTransition } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Star, Undo, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { useTranslation } from "@/hooks/use-translation-cache";
 import { useQueryClient } from "@tanstack/react-query";
+import { SessionSummary } from "@/components/learn/session-summary";
 
 interface Word {
   id: string;
@@ -48,6 +49,7 @@ export default function LearningSessionPage() {
   const [direction, setDirection] = useState("main_to_trans1");
   const [sessionType, setSessionType] = useState<string>("");
   const [sections, setSections] = useState<number[]>([]);
+  const [isStartingMistakes, setIsStartingMistakes] = useState(false);
 
   const x = useMotionValue(0);
   const cardRotate = useTransform(x, [-300, 0, 300], [-45, 0, 45]);
@@ -353,6 +355,7 @@ export default function LearningSessionPage() {
   if (completed) {
     const handlePracticeMistakes = async () => {
       try {
+        setIsStartingMistakes(true);
         const response = await fetch("/api/learn/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -374,30 +377,28 @@ export default function LearningSessionPage() {
         router.push(`/dashboard/learn/session/${data.sessionId}`);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to start mistakes session");
+        setIsStartingMistakes(false);
       }
     };
 
+    const mistakeWords = cards
+      .filter((card) => card.isCorrect === false)
+      .map((card) => card.word);
+
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Session Complete!</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-6">
-            <div className="text-2xl font-bold mb-4">Great job!</div>
-            <div className="flex gap-4 mb-4">
-              <div className="text-green-600">✓ {correctCount} correct</div>
-              <div className="text-red-600">✗ {incorrectCount} incorrect</div>
-            </div>
-            <Button onClick={() => router.push('/dashboard')}>Back to Learn</Button>
-            {incorrectCount > 0 && (
-              <Button variant="secondary" onClick={handlePracticeMistakes}>
-                Practice Mistakes ({incorrectCount})
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <SessionSummary
+        correctCount={correctCount}
+        incorrectCount={incorrectCount}
+        mistakes={mistakeWords}
+        sessionType={sessionType}
+        isImportant={(word) => optimisticImportant[word.id] ?? !!word.important}
+        onToggleImportant={handleMarkImportant}
+        onPlayTTS={playTTS}
+        ttsLoading={ttsLoading}
+        onPracticeMistakes={handlePracticeMistakes}
+        isStartingMistakes={isStartingMistakes}
+        onBackToLearn={() => router.push("/dashboard")}
+      />
     );
   }
 
