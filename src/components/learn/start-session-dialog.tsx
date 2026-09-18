@@ -30,13 +30,33 @@ import { Input } from "@/components/ui/input";
 import type { UserLanguagePreferences } from "@/lib/languages";
 
 type SessionMode = "review" | "new" | "mistakes" | "custom" | "important" | "randomized";
+const EMPTY_SECTIONS: string[] = [];
 
 interface StartSessionDialogProps {
   children?: React.ReactNode;
   mode?: SessionMode;
+  /** Preselect sections when this dialog is opened from a section-specific view. */
+  initialSections?: string[];
+  /** The number shown initially for a custom session. */
+  initialCustomWordCount?: number;
+  /** Optional UI cap for a context such as the currently visible page. */
+  maxCustomWordCount?: number;
+  /**
+   * Explicit word IDs from the current paginated page. When provided the
+   * session will be created from exactly these words (or a slice of them)
+   * instead of querying the section at random.
+   */
+  pageWordIds?: string[];
 }
 
-export function StartSessionDialog({ children, mode = "new" }: StartSessionDialogProps) {
+export function StartSessionDialog({
+  children,
+  mode = "new",
+  initialSections = EMPTY_SECTIONS,
+  initialCustomWordCount,
+  maxCustomWordCount,
+  pageWordIds,
+}: StartSessionDialogProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
@@ -45,12 +65,29 @@ export function StartSessionDialog({ children, mode = "new" }: StartSessionDialo
   const [languagePrefs, setLanguagePrefs] = useState<UserLanguagePreferences | null>(null);
   const [directionOptions, setDirectionOptions] = useState<Array<{value: string; label: string}>>([]);
   // MultiSelect returns string[]; store as string[] in state
-  const [section, setSection] = useState<string[]>([]);
+  const [section, setSection] = useState<string[]>(initialSections);
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [customMode, setCustomMode] = useState<"randomized" | "mistakes" | "important">("randomized");
-  const [customWordCount, setCustomWordCount] = useState<string>("");
+  const [customWordCount, setCustomWordCount] = useState<string>(
+    initialCustomWordCount ? String(initialCustomWordCount) : ""
+  );
   const [selectAll, setSelectAll] = useState(false);
+
+  // The words page supplies a section and the size of its visible page. Reset
+  // these preset values before it opens, while leaving the dashboard's
+  // existing dialog behaviour unchanged.
+  const handleOpenChange = (nextOpen: boolean) => {
+    const hasPreset = initialSections.length > 0 || initialCustomWordCount !== undefined;
+    if (nextOpen && hasPreset) {
+      setSessionType(mode);
+      setSection(initialSections);
+      setSectionError(null);
+      setSelectAll(false);
+      setCustomWordCount(initialCustomWordCount ? String(initialCustomWordCount) : "");
+    }
+    setOpen(nextOpen);
+  };
 
   // Fetch user language preferences
   useEffect(() => {
@@ -117,12 +154,35 @@ export function StartSessionDialog({ children, mode = "new" }: StartSessionDialo
         body = { type: "important", direction };
       }
       if (sessionType === "custom") {
-        body = {
-          type: customMode,
-          direction,
-          sections: section,
-          wordCount: selectAll ? "all" : Number(customWordCount) || 20,
-        };
+        const requestedCount = Number(customWordCount) || 20;
+        const wordCount = maxCustomWordCount
+          ? Math.min(Math.max(requestedCount, 1), maxCustomWordCount)
+          : requestedCount;
+
+        if (selectAll) {
+          // "Select All" → use all words in the section (no wordIds constraint)
+          body = {
+            type: customMode,
+            direction,
+            sections: section,
+            wordCount: "all",
+          };
+        } else if (pageWordIds && pageWordIds.length > 0) {
+          // Page-specific session: send the exact word IDs from the visible page
+          body = {
+            type: customMode,
+            direction,
+            sections: section,
+            wordIds: pageWordIds.slice(0, wordCount),
+          };
+        } else {
+          body = {
+            type: customMode,
+            direction,
+            sections: section,
+            wordCount,
+          };
+        }
       }
       const response = await fetch("/api/learn/sessions", {
         method: "POST",
@@ -151,7 +211,7 @@ export function StartSessionDialog({ children, mode = "new" }: StartSessionDialo
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {children || <Button className="cursor-pointer">Start Learning</Button>}
       </DialogTrigger>
@@ -216,12 +276,18 @@ export function StartSessionDialog({ children, mode = "new" }: StartSessionDialo
                     id="custom-word-count"
                     type="number"
                     min={1}
+                    max={maxCustomWordCount}
                     value={selectAll ? "" : customWordCount}
                     onChange={e => {
-                      setCustomWordCount(e.target.value);
+                      const input = e.target.value;
+                      const parsed = Number(input);
+                      const bounded = maxCustomWordCount && parsed > maxCustomWordCount
+                        ? String(maxCustomWordCount)
+                        : input;
+                      setCustomWordCount(bounded);
                       setSelectAll(false);
                     }}
-                    placeholder="e.g. 20 (default)"
+                    placeholder={maxCustomWordCount ? `1–${maxCustomWordCount}` : "e.g. 20 (default)"}
                     disabled={selectAll}
                     className="w-full sm:w-32"
                   />
@@ -237,6 +303,11 @@ export function StartSessionDialog({ children, mode = "new" }: StartSessionDialo
                     {selectAll ? "All" : "Select All"}
                   </Button>
                 </div>
+                {maxCustomWordCount && !selectAll && (
+                  <p className="text-xs text-muted-foreground">
+                    Choose 1–{maxCustomWordCount} words from this page, or select all words in the section.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -272,7 +343,8 @@ export function StartSessionDialog({ children, mode = "new" }: StartSessionDialo
                 setSection(values);
                 if (values.length > 0) setSectionError(null);
               }}
-              defaultValue={section}
+              value={section}
+              defaultValue={initialSections}
               placeholder="Select sections"
               maxCount={5}
             />

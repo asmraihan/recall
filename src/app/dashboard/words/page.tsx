@@ -13,11 +13,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SingleSelect } from "@/components/ui/single-select";
 import { WordList } from "@/components/words/word-list";
-import { ChevronLeft, ChevronRight, Loader2, Upload, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, GraduationCap, Loader2, Plus, X } from "lucide-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import { ExportDialog } from "@/components/words/export-import";
+import { StartSessionDialog } from "@/components/learn/start-session-dialog";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import Link from "next/link";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Columns3Cog } from "lucide-react";
 
@@ -196,22 +196,24 @@ export default function WordsPage() {
           <p className="text-muted-foreground mt-2">Manage your vocabulary collection</p>
         </div>
         <div className="flex gap-2">
-          <ExportDialog
-            selectedIds={Object.keys(rowSelection).filter((id) => rowSelection[id])}
-            visibleColumns={[
-              ...Object.keys(columnVisibility).filter(
-                (k) => columnVisibility[k] && k !== "actions"
-              ),
-              "important", // always exported so the flag round-trips (not a toggleable column)
-            ]}
-            section={section ?? undefined}
-            totalWords={total}
-            allowAll={false}
-          />
-          <Button asChild variant="outline">
+          {section && section !== "all" && (
+            <StartSessionDialog
+              mode="custom"
+              initialSections={[section]}
+              initialCustomWordCount={words.length}
+              maxCustomWordCount={words.length}
+              pageWordIds={words.map((w) => w.id)}
+            >
+              <Button disabled={isLoading || isFetching || words.length === 0}>
+                <GraduationCap className="mr-2 h-4 w-4" />
+                Start Session
+              </Button>
+            </StartSessionDialog>
+          )}
+          <Button variant="outline" asChild>
             <Link href="/dashboard/words/add">
-              <Upload className="mr-2 h-4 w-4" />
-              Add Words
+              <Plus className="mr-2 h-4 w-4" />
+              Add/Export
             </Link>
           </Button>
         </div>

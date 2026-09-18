@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const auth = await requireUser(req);
     if (auth instanceof NextResponse) return auth;
 
-    const { type, direction, sections, wordCount, sourceSessionId } = await req.json();
+    const { type, direction, sections, wordCount, sourceSessionId, wordIds } = await req.json();
 
     // Validate input
     if (!type || !direction) {
@@ -45,6 +45,37 @@ export async function POST(req: Request) {
         if (!isNaN(parsed) && parsed > 0) customLimit = parsed;
       }
     }
+
+    // ── Explicit word-ID list (page-specific session from the words page) ──
+    // When the client sends `wordIds`, create the session from exactly those
+    // words instead of going through the type-based switch below.
+    if (Array.isArray(wordIds) && wordIds.length > 0) {
+      wordsToLearn = await db
+        .select({
+          id: words.id,
+          mainWord: words.mainWord,
+          translation1: words.translation1,
+          translation2: words.translation2,
+          section: words.section,
+        })
+        .from(words)
+        .where(
+          and(
+            eq(words.createdBy, auth.userId),
+            inArray(words.id, wordIds)
+          )
+        )
+        .orderBy(sql`RANDOM()`);
+
+      if (wordsToLearn.length === 0) {
+        return new NextResponse(
+          JSON.stringify({ error: "No words available for this session type" }),
+          { status: 400 }
+        );
+      }
+
+      // Jump straight to session creation
+    } else {
 
     switch (type) {
       case "review": {
@@ -283,6 +314,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    } // end of else (non-wordIds path)
 
     // Create new session
     const sessionId = crypto.randomUUID();

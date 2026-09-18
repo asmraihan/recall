@@ -10,23 +10,23 @@ export async function GET(req: Request) {
     if (auth instanceof NextResponse) return auth;
 
     // Get distinct sections for the user's words
-    const sections = await db
+    const sectionsData = await db
       .select({
-        section: words.section
+        section: words.section,
+        count: sql<number>`count(*)`.mapWith(Number)
       })
       .from(words)
       .where(eq(words.createdBy, auth.userId))
       .groupBy(words.section)
-      // Ensure sections are ordered by createdAt
-      // .orderBy(sql` MIN(${words.createdAt})`)
-      // Ensure sections are ordered numerically and alphabetically but like 1, 2 .... to 10, ... 12,... , C, D,......Z etc.
+      // Ensure sections are ordered numerically and alphabetically
       .orderBy(sql`CASE 
         WHEN section ~ '^[0-9]+$' THEN CAST(section AS INTEGER)
         ELSE NULL
       END, section`);
 
     return NextResponse.json({
-      sections: sections.map(s => s.section)
+      sections: sectionsData.map(s => s.section),
+      sectionStats: sectionsData
     });
   } catch (error) {
     console.error("[SECTIONS_GET]", error);

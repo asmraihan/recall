@@ -18,10 +18,10 @@ const defaultFields = [
   "updatedAt",
 ];
 
-async function fetchWordsForUser(userId: string, section?: string) {
+async function fetchWordsForUser(userId: string, sections?: string[]) {
   const conditions = [eq(words.createdBy, userId)];
-  if (section && section !== "all") {
-    conditions.push(eq(words.section, section));
+  if (Array.isArray(sections) && sections.length > 0) {
+    conditions.push(inArray(words.section, sections));
   }
   return db.select().from(words).where(and(...conditions)).orderBy(words.createdAt);
 }
@@ -37,25 +37,27 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { ids, columns, all, section } = body as { ids?: string[]; columns?: string[]; all?: boolean; section?: string };
+    const { ids, columns, all, sections } = body as { ids?: string[]; columns?: string[]; all?: boolean; sections?: string[] };
 
     let userWords: any[] = [];
 
     if (all) {
-      userWords = await fetchWordsForUser(session.user.id as string, section);
+      userWords = await fetchWordsForUser(session.user.id as string, sections);
     } else if (Array.isArray(ids) && ids.length > 0) {
       // fetch only rows with the provided ids and belonging to the user
       const conditions = [eq(words.createdBy, session.user.id), inArray(words.id, ids)];
-      if (section && section !== "all") {
-        conditions.push(eq(words.section, section));
+      if (Array.isArray(sections) && sections.length > 0) {
+        conditions.push(inArray(words.section, sections));
       }
       userWords = await db.select().from(words).where(and(...conditions)).orderBy(words.createdAt);
       // reorder to match ids order
       const orderMap = new Map(ids.map((id, i) => [id, i]));
       userWords.sort((a: any, b: any) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+    } else if (Array.isArray(sections) && sections.length > 0) {
+      userWords = await fetchWordsForUser(session.user.id as string, sections);
     } else {
       // default: return all user's words
-      userWords = await fetchWordsForUser(session.user.id as string, section);
+      userWords = await fetchWordsForUser(session.user.id as string, sections);
     }
 
     const requestedFields =
