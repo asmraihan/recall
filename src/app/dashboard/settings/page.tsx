@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { VoiceCombobox, type Voice } from "@/components/ui/voice-combobox";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { DeleteSectionWords } from "@/components/words/delete-section-words";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -356,6 +357,7 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <DeleteSectionWords />
               <div className="flex flex-col md:flex-row items-end justify-between gap-4 p-4 border rounded-lg border-destructive/20">
                 <div className="space-y-1">
                   <h4 className="text-sm font-semibold">Delete All Learning Sessions</h4>
