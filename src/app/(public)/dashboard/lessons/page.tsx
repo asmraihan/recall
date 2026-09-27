@@ -2,6 +2,14 @@ import Link from "next/link";
 import { BookText, ChevronRight } from "lucide-react";
 import { listLessons } from "@/lib/lessons";
 import { Card, CardContent } from "@/components/ui/card";
+import type { Metadata } from "next";
+import { lessonUrl } from "@/lib/public-lessons";
+
+export const metadata: Metadata = {
+  title: "German lessons and notebooks | Recall",
+  description: "Read the complete German grammar notebooks, explanations, tables, examples and study notes. No account required.",
+  alternates: { canonical: lessonUrl() },
+};
 
 export const dynamic = "force-static";
 

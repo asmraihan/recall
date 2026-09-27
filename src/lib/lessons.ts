@@ -21,6 +21,12 @@ export interface Lesson extends LessonMeta {
   toc: TocEntry[];
 }
 
+export async function getLessonSource(slug: string): Promise<string | null> {
+  // Resolve only known lesson files, never join user input into a filesystem path.
+  const filename = await findFileForSlug(slug);
+  return filename ? fs.readFile(path.join(LESSONS_DIR, filename), "utf8") : null;
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()

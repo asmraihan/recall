@@ -12,8 +12,8 @@ export default function BatchAddPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Batch Add Words</h1>
         <p className="mt-2 text-muted-foreground">
-          Add a whole chapter at once — let AI format a messy paste, or paste ready-made
-          CSV yourself.
+          Paste a whole chapter in one place. CSV is detected and cleaned up automatically;
+          unformatted text uses AI formatting.
         </p>
       </div>
       <BatchAddForm />

@@ -3,8 +3,22 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, List } from "lucide-react";
 import { getLesson, listLessons } from "@/lib/lessons";
 import { LessonToc } from "@/components/lessons/lesson-toc";
+import type { Metadata } from "next";
+import { lessonUrl } from "@/lib/public-lessons";
 
 export const dynamic = "force-static";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const lesson = await getLesson(slug);
+  if (!lesson) return { title: "Lesson not found | Recall", robots: { index: false } };
+  return {
+    title: `${lesson.title} | Recall`,
+    description: `Read ${lesson.title}: full grammar explanations, tables, examples and study notes.`,
+    alternates: { canonical: lessonUrl(slug), types: { "text/markdown": `${lessonUrl(slug)}/markdown` } },
+    openGraph: { title: lesson.title, type: "article", url: lessonUrl(slug) },
+  };
+}
 
 export async function generateStaticParams() {
   const lessons = await listLessons();
@@ -24,7 +38,7 @@ export default async function LessonPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Link
           href="/dashboard/lessons"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -32,6 +46,9 @@ export default async function LessonPage({
           <ArrowLeft className="h-4 w-4" />
           All lessons
         </Link>
+        <a href={`/dashboard/lessons/${lesson.slug}/markdown`} className="text-sm text-muted-foreground underline underline-offset-4">
+          Read as Markdown
+        </a>
       </div>
 
       <h1 className="text-2xl font-semibold tracking-tight mb-2">{lesson.title}</h1>

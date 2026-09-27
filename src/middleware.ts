@@ -1,30 +1,28 @@
-import { withAuth } from "next-auth/middleware";
-import { NextResponse } from "next/server";
+import { withAuth, type NextRequestWithAuth } from "next-auth/middleware";
+import { NextResponse, type NextFetchEvent } from "next/server";
+import { isPublicLessonPath } from "@/lib/public-lessons";
 
 // Routes under /dashboard that are accessible without signing in
-const PUBLIC_PATHS = ["/dashboard/lessons"];
-
-function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
-}
-
-export default withAuth(
+const authenticatedMiddleware = withAuth(
   function middleware() {
     // Add custom middleware logic here if needed
     return NextResponse.next();
   },
   {
     callbacks: {
-      authorized: ({ token, req }) =>
-        isPublicPath(req.nextUrl.pathname) || !!token,
+      authorized: ({ token }) => !!token,
     },
     pages: {
       signIn: "/auth/signin",
     },
   }
 );
+
+export default function middleware(req: NextRequestWithAuth, event: NextFetchEvent) {
+  // Public notebooks do not need token decoding, a cookie, or an auth service.
+  if (isPublicLessonPath(req.nextUrl.pathname)) return NextResponse.next();
+  return authenticatedMiddleware(req, event);
+}
 
 export const config = {
   matcher: [
