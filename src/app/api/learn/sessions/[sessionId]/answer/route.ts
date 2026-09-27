@@ -32,6 +32,12 @@ export async function POST(req: Request, context: { params: Promise<{ sessionId:
     if (!learningSession) {
       return new NextResponse("Session not found", { status: 404 });
     }
+    // Mobile retries must update their original session, never create another
+    // completed sitting or apply the same answer to spaced repetition twice.
+    const [sessionWord] = await db.select({ answeredAt: sessionWords.answeredAt }).from(sessionWords)
+      .where(and(eq(sessionWords.sessionId, sessionId), eq(sessionWords.wordId, wordId)));
+    if (!sessionWord) return new NextResponse("Word not in session", { status: 404 });
+    if (sessionWord.answeredAt === null) {
     // Use generic default direction (main_to_trans1) instead of hardcoded language
     const preferredDirection = learningSession.direction || "main_to_trans1";
 
@@ -76,6 +82,9 @@ export async function POST(req: Request, context: { params: Promise<{ sessionId:
       })
       .where(and(eq(sessionWords.sessionId, sessionId), eq(sessionWords.wordId, wordId)));
 
+    }
+
+    // Also reconcile completion on a retry after a partially failed request.
     // Check if all words are answered
     const unanswered = await db
       .select()
@@ -98,7 +107,7 @@ export async function POST(req: Request, context: { params: Promise<{ sessionId:
           correctAnswers: correctCount.length,
           incorrectAnswers: incorrectCount.length,
         })
-        .where(eq(learningSessions.id, sessionId));
+        .where(and(eq(learningSessions.id, sessionId), eq(learningSessions.status, "in_progress")));
     }
 
     return NextResponse.json({ success: true });
