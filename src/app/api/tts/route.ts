@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Communicate, listVoices } from 'edge-tts-universal';
+import { EdgeTTS } from '@andresaya/edge-tts';
 import { requireUser } from '@/lib/api-auth';
 
+export const runtime = 'nodejs';
+
+const DEFAULT_VOICE = 'de-DE-AmalaNeural';
 
 // get all available voices
 // Authenticated: leaving this open turns a documented API surface into a free
@@ -12,11 +15,11 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const voices = await listVoices();
+    const voices = await new EdgeTTS().getVoices();
     return NextResponse.json({ voices });
   } catch (error) {
     console.error('TTS error:', error);
-    return NextResponse.json({ error: 'Failed to fetch voices' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch voices' }, { status: 502 });
   }
 }
 
@@ -44,30 +47,23 @@ export async function POST(request: Request) {
   try {
     const { text, voice, rate, volume, pitch } = await request.json();
 
-    if (!text) {
+    if (typeof text !== 'string' || !text.trim()) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
-    const selectedVoice = voice || 'de-DE-AmalaNeural';
-    const communicate = new Communicate(text, {
-      voice: selectedVoice,
+    const selectedVoice = typeof voice === 'string' && voice.trim() ? voice.trim() : DEFAULT_VOICE;
+    const tts = new EdgeTTS();
+    await tts.synthesize(text, selectedVoice, {
       rate: normalizeParam(rate, /^[+-]\d+%$/, '-20%'),
       volume: normalizeParam(volume, /^[+-]\d+%$/, '+20%'),
       pitch: normalizeParam(pitch, /^[+-]\d+Hz$/, '-10Hz'),
+      outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(25_000)]),
     });
 
-    const buffers: Buffer[] = [];
-    for await (const chunk of communicate.stream()) {
-      if (chunk.type === 'audio' && chunk.data) {
-        buffers.push(chunk.data);
-      }
-    }
-
-    const audioBuffer = Buffer.concat(buffers);
-    const base64Audio = audioBuffer.toString('base64');
-    return NextResponse.json({ audio: base64Audio });
+    return NextResponse.json({ audio: tts.toBuffer().toString('base64') });
   } catch (error) {
     console.error('TTS error:', error);
-    return NextResponse.json({ error: 'Failed to generate speech' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to generate speech' }, { status: 502 });
   }
 }
